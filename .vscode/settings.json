@@ -1,0 +1,8 @@
+{
+    "editor.tabSize": 4,
+    "colorize.colorized_colors": [
+        "ARGB",
+        "RGB",
+        "HEXA"
+    ]
+}
