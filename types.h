@@ -15,19 +15,14 @@ struct luminance {
     int lum;
 };
 
-// Forward declarations of globals (these will be defined in the main sketch)
-extern int** handoverColor;
+// Forward declarations of globals
 extern const float maxBrightness;
 extern const luminance redLum;
 extern const luminance greenLum;
 extern const luminance blueLum;
 
-// Struct to hold color information with hue and brightness
-struct ColorInfo {
-    const int* color;
-    float hue;
-    float brightness;
-};
+// Handover color
+extern int handoverColor[2][3];
 
 // Store the light sensor value (declaration only, definition is in the main sketch)
 extern float ambientBrightness;

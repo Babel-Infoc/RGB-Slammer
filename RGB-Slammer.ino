@@ -11,6 +11,10 @@ ledSegment led2 = {1, PC5, PC6, PC4};
 // Array of ledSegments
 const ledSegment leds[] = {led1, led2};
 
+// Global variable definitions
+int handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}}; // Definition for extern variable from types.h
+float ambientBrightness = 1.0; // Definition of the extern variable from types.h
+
 // Max output brightness modifier (between 0.2 and 1)
 const float maxBrightness   = 0.5;
 
@@ -25,21 +29,15 @@ const luminance blueLum      = {3, 18};
 
 // Declare the gamma correction array
 extern const uint8_t gamma8[];
-// Global variable definitions
-int** handoverColor = nullptr; // Definition of the extern variable from types.h
-float ambientBrightness = 1.0; // Definition of the extern variable from types.h
 
 // MARK: ------------------------------ Setup ------------------------------
 void setup() {
-    // Dynamically allocate memory for handoverColor arrays
-    handoverColor = new int*[numSegments];
     for (int i = 0; i < numSegments; i++) {
-        handoverColor[i] = new int[3] {0, 0, 0};
         pinMode(leds[i].redPin, OUTPUT);
         pinMode(leds[i].greenPin, OUTPUT);
         pinMode(leds[i].bluePin, OUTPUT);
     }
-    //startup();
+   startup();
 }
 
 // MARK: ------------------------------ Loop ------------------------------
@@ -84,7 +82,6 @@ void pulseColor(const char* highColor, const char* lowColor, const int speed, co
     for (int j = 0; j < reps; j++) {
         fadeToColor(highColor, highColor, speed/6);
         fadeToColor(lowColor, lowColor,  speed);
-        fadeToColor(highColor, highColor, speed);
         fadeToColor(lowColor, lowColor,  speed*3);
     }
 }
@@ -169,22 +166,24 @@ void slamFade(const ledSegment& segment, const char* startColor, const char* end
 
 // Fades from the most recent color displayed before this function, to the endColor, over the fadeTime
 void fadeToColor(const char* color1, const char* color2, const int fadeTime) {
-    int color1Array[3];
-    int color2Array[3];
+    const int color1Array[3];
+    const int color2Array[3];
     int startColor1[3];
     int startColor2[3];
     int rgbProgress1[3];
     int rgbProgress2[3];
+    unsigned long startTime = millis();
 
     // Convert the color strings to RGB arrays
     rgbStringToArray(color1, color1Array);
     rgbStringToArray(color2, color2Array);
 
+    // Pull the start color from the most recent handover, once
     for (int i = 0; i < 3; i++) {
         startColor1[i] = handoverColor[0][i];
         startColor2[i] = handoverColor[1][i];
     }
-    unsigned long startTime = millis();
+
     while (millis() - startTime < fadeTime) {
         float fadeRatio = (float)(millis() - startTime) / fadeTime;
         for (int i = 0; i < 3; i++) {

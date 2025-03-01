@@ -45,7 +45,7 @@ const uint8_t gamma8[] = {
 
 // MARK: ------------------------------ RGB Processing ------------------------------
 // Convert the rgb string to an RGB Array
-void rgbStringToArray(const char* rgbString, int rgbArray[3]) {
+void rgbStringToArray(const char* rgbString, const int rgbArray[3]) {
     sscanf(rgbString, "rgb(%d,%d,%d)", &rgbArray[0], &rgbArray[1], &rgbArray[2]);
 }
 
