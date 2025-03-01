@@ -15,9 +15,11 @@ struct luminance {
     int lum;
 };
 
+// Number of LED segments
+extern const int numSegments;
+
 // Forward declarations of globals
 extern const float maxBrightness;
-extern float ambientBrightness;
 extern const luminance redLum;
 extern const luminance greenLum;
 extern const luminance blueLum;

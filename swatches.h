@@ -1,8 +1,6 @@
 #ifndef SWATCHES_H
 #define SWATCHES_H
 
-#include "types.h"
-
 // Define color arrays
 const char* const Anodize[] = {
     "rgb(255,250,240)",
@@ -44,7 +42,7 @@ const char* const bootswatch[] = {
     "rgb(209, 0, 52)",
     "rgb(75,0,130)",
     "rgb(0, 0, 97)"
-    "rgb(0,0,0)",
+    //"rgb(0,0,0)",
 };
 
 #endif // SWATCHES_H
