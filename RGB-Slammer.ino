@@ -37,43 +37,31 @@ void setup() {
         pinMode(leds[i].greenPin, OUTPUT);
         pinMode(leds[i].bluePin, OUTPUT);
     }
-   startup();
+    startup();
 }
 
 // MARK: ------------------------------ Loop ------------------------------
 void loop() {
-    // Update the sequence for each LED segment
-    showColor           ("rgb(255,0,0)",    "rgb(0,0,255)",     1000);
-    showColor           ("rgb(0,0,255)",    "rgb(255,0,0)",     1000);
-    fadeToColor         ("rgb(255,0,0)",    "rgb(0,0,255)",     1000);
-    fadeToColor         ("rgb(0,0,255)",    "rgb(255,0,0)",     1000);
-    //fadeToColor         ("rgb(255,69,0)", "rgb(0,206,209)", 2000);
-    //strobe              ("rgb(255,0,0)", "rgb(105,105,105)", 70, 2);
-    //randomFade          (Anodize, 20, 400, 5);
-    //startup();
-    //pulseColor          ("rgb(75,0,130)", "rgb(0,0,128)", 200, 2);
-    //pulseColor          ("rgb(175,238,238)", "rgb(0,128,128)", 200, 2);
-    //progressiveFade     (BisexualLighting, 1, 150, 1);
-    //pulseColor          ("rgb(128,0,128)", "rgb(255,69,0)", 200, 2);
-    //randomFade          (Anodize, 200, 2000, 10);
-    //progressiveFade     (BisexualLighting, 1, 150, 2);
+    fadeToColor         ("rgb(255,0,0)",        "rgb(0,0,255)",     200);
+    fadeToColor         ("rgb(0,0,255)",        "rgb(228, 0, 140)",     200);
+    strobe              ("rgb(255,0,0)",        "rgb(30,30,50)", 70, 2);
+    randomFade          (Anodize,           20, 400, 5);
+    pulseColor          ("rgb(75,0,130)",       "rgb(0,0,128)",     200, 2);
+    pulseColor          ("rgb(175,238,238)",    "rgb(0,128,128)",   200, 2);
+    progressiveFade     (BisexualLighting,  1, 150, 1);
+    pulseColor          ("rgb(128,0,128)",      "rgb(255,69,0)",    200, 2);
 }
 
 // MARK: ------------------------------ Sequence control ------------------------------
 void startup(){
-    unsigned long startTime = millis();
-    for (int i = 0; i < numSegments; i++) {
-        unsigned long segmentStartTime = startTime + (i * 300);
-        while (millis() < segmentStartTime) {
-            // Wait until the staggered start time for this segment
-        }
-        for (int j = 0; j < 3; j++) {
-            fadeToColor("rgb(0,0,0)",           "rgb(255,255,255)",     50);            // #FFFFFF
-            fadeToColor("rgb(255,255,255)",     "rgb(255,69,0)",        50);            // #ff4500
-            fadeToColor("rgb(255,69,0)",        "rgb(75,0,130)",        50);            // #4B0082
-            fadeToColor("rgb(75,0,130)",        "rgb(0,0,128)",         50);            // #000080
-            fadeToColor("rgb(0,0,128)",         "rgb(0,0,0)",           50);            // #000000
-            fadeToColor("rgb(0,0,0)",           "rgb(0,0,0)",           50);            // #FFFFFF
+    int swatchSize = sizeof(bootswatch) / sizeof(bootswatch[0]);
+    for (int j = 0; j < 3; j++) {
+        for (int k = 0; k < swatchSize+1; k++) {
+            if (k  > swatchSize) {
+                k = swatchSize - k;
+            }
+            slamFade(leds[0], bootswatch[k],        bootswatch[(k + 1)], 20);
+            slamFade(leds[1], bootswatch[(k + 1)],  bootswatch[(k + 2)], 20);
         }
     }
 }
@@ -86,15 +74,13 @@ void pulseColor(const char* highColor, const char* lowColor, const int speed, co
     }
 }
 
-void randomFade(const char* swatch[], const int maxspeed, const int minspeed, const int reps) {
+void randomFade(const char* swatch, const int maxspeed, const int minspeed, const int reps) {
     int swatchSize = sizeof(swatch) / sizeof(swatch[0]);
-    for (int i = 0; i < numSegments; i++) {
-        for (int j = 0; j < reps; j++) {
-            int colorIndex1 = random(0, swatchSize);
-            int colorIndex2 = random(0, swatchSize);
-            int fadeTime = random(minspeed, maxspeed);
-            fadeToColor(swatch[colorIndex1], swatch[colorIndex2], fadeTime);
-        }
+    for (int j = 0; j < reps; j++) {
+        int SW1 = random(0, swatchSize);
+        int SW2 = random(0, swatchSize);
+        int fadeTime = random(minspeed, maxspeed);
+        fadeToColor(swatch[SW1], swatch[SW2], fadeTime);
     }
 }
 
