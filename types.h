@@ -17,14 +17,12 @@ struct luminance {
 
 // Forward declarations of globals
 extern const float maxBrightness;
+extern float ambientBrightness;
 extern const luminance redLum;
 extern const luminance greenLum;
 extern const luminance blueLum;
 
 // Handover color
 extern int handoverColor[2][3];
-
-// Store the light sensor value (declaration only, definition is in the main sketch)
-extern float ambientBrightness;
 
 #endif // TYPES_H
