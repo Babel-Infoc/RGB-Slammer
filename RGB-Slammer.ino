@@ -261,47 +261,6 @@ void slamFade(const char* startColor, const char* endColor, const int fadeTime) 
     }
 }
 
-/*
-// Optimized neonFlicker function using integer math
-void neonFlicker(const char* mainColor, const char* flickerColor, const int intensity, const int chance, const int duration) {
-    int mainRGB[3];
-    int flickerRGB[3];
-    int flickerOutput[3];
-    rgbStringToArray(mainColor, mainRGB);
-    rgbStringToArray(flickerColor, flickerRGB);
-
-    // Convert float parameters to fixed point integers (0-100)
-    const int chanceInt = chance * 100;
-    const int intensityInt = intensity * 100;
-
-    unsigned long endTime = millis() + duration;
-    // Run until duration is complete
-    while (millis() < endTime) {
-        for (int j = 0; j < numSegments; j++) {
-            // Determine if we should flicker this LED
-            bool shouldFlicker = random(0, 100) < chanceInt;
-
-            if (shouldFlicker) {
-                // Calculate a random flicker strength (0-100)
-                int flickerInt = random(0, intensityInt);
-
-                // Mix the colors using integer math
-                for (int r = 0; r < 3; r++) {
-                    // Formula: mainRGB + (flickerRGB - mainRGB) * (flickerInt/100)
-                    // This is equivalent to: mainRGB + (flickerRGB - mainRGB) * flickerStrength
-                    flickerOutput[r] = mainRGB[r] + ((flickerRGB[r] - mainRGB[r]) * flickerInt) / 100;
-                }
-                sendToRGB(leds[j], flickerOutput);
-            } else {
-                // No flicker, just show the main color
-                sendToRGB(leds[j], mainRGB);
-            }
-        }
-        // Short delay to prevent overwhelming the processor
-        delay(1);
-    }
-}*/
-
 // MARK: neonFlicker
 // Simulates a failing neon / fluorescent light flicker, adjust intensity and chance of flicker events
 void neonFlicker(const char* mainColor, const char* flickerColor, const int intensity, const int chance, const int duration) {
