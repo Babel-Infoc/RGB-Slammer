@@ -3,8 +3,6 @@
 
 // Define color arrays
 const char* const Anodize[] = {
-    "rgb(255,250,240)",
-    "rgb(238,232,170)",
     "rgb(255,255,0)",
     "rgb(255,215,0)",
     "rgb(255,165,0)",

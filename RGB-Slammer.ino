@@ -4,6 +4,7 @@
 #include "rgbProcessor.h"
 
 // MARK: ------------------------------ Variables and config ------------------------------
+
 // Define each of the RGB Array pins, { segment number, R, G, B }
 ledSegment led1 = {0, PD5, PD3, PD4};
 ledSegment led2 = {1, PC5, PC6, PC4};
@@ -46,10 +47,10 @@ void setup() {
 =======================================================================================*/
 
 void loop() {
-    startup();
+    //startup();
     //fadeToColor        ("rgb(0, 160, 223)",        "rgba(0, 0, 255, 0.84)",     200);
     //strobe              ("rgb(255,0,0)",        "rgb(30,30,50)", 70, 2);
-    //neonFlicker         ("rgb(175,238,238)",        "rgb(6, 105, 105)", 100,  70,  1000);
+    neonFlicker         ("rgb(122, 217, 255)",        "rgb(52, 91, 107)", 70,  5,  1000);
     //progressiveFade     (Anodize,            2000, 1);
     //randomFade          (Anodize,               50, 1000, 10);
     //pulseColor          ("rgb(175,238,238)",    "rgb(0,128,128)",   200, 2);
@@ -141,7 +142,7 @@ void startup(){
             fadeToColor(bootswatch[k], bootswatch[(k + 1) % swatchSize], speedAdj);
         }
     }
-    fadeToColor("rgb(0,0,0)", "rgb(0,0,0)", speed*5);
+    fadeToColor("rgb(0,0,0)", "rgb(0,0,0)", speed*6);
 }
 
 // MARK: ------------------------------ Animation Elements ------------------------------
@@ -304,33 +305,26 @@ void neonFlicker(const char* mainColor, const char* flickerColor, const int inte
 // MARK: neonFlicker
 // Simulates a failing neon / fluorescent light flicker, adjust intensity and chance of flicker events
 void neonFlicker(const char* mainColor, const char* flickerColor, const int intensity, const int chance, const int duration) {
-    int     mainRGB[numSegments][3];
-    int     flickerRGB[numSegments][3];
-    bool    flickerChance[numSegments];   // between 0 and 100
-    int     flickerIntensity[numSegments]; // between 0 and 100
-    int     output[numSegments][3];
-    for (int i = 0; i < numSegments; i++) {
-        rgbStringToArray(mainColor, mainRGB[i][3]);
-        rgbStringToArray(flickerColor, flickerRGB[i][3]);
-    }
+    int mainRGB[3];
+    int flickerRGB[3];
+    int flickerOutput[3];
+    rgbStringToArray(mainColor, mainRGB);
+    rgbStringToArray(flickerColor, flickerRGB);
 
-    // For <duration>...
-    for (int d = 0; d < duration; d++) {
-        // Calculate flicker chance and intensity
+    unsigned long endTime = millis() + duration;
+    while (millis() < endTime) {
         for (int j = 0; j < numSegments; j++) {
-            flickerChance[j] = random(0, 50) < chance;
-            flickerIntensity[j] = random(0, intensity);
-
-            // If flickerChance is true, mix the colors at, else show the main color
-            for (int r = 0; r < 3; r++) {
-                    if (flickerChance[j]) {
-                    // Formula: mainRGB + (flickerRGB - mainRGB) * (flickerInt/100)
-                    output[j][r] = ((flickerRGB[j][r]) * flickerIntensity[j]) / 100;
-                    } else {
-                        output[j][r] = mainRGB[j][r];
-                    }
+            bool shouldFlicker = random(0, 100) < chance;
+            if (shouldFlicker) {
+                int flickerInt = random(0, intensity);
+                for (int r = 0; r < 3; r++) {
+                    flickerOutput[r] = mainRGB[r] + ((flickerRGB[r] - mainRGB[r]) * flickerInt) / 100;
                 }
-            sendToRGB(leds[j], output[j]);
+                sendToRGB(leds[j], flickerOutput);
+            } else {
+                sendToRGB(leds[j], mainRGB);
+            }
         }
+        delay(20);
     }
 }
