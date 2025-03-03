@@ -15,7 +15,8 @@ const char* const Anodize[] = {
     "rgb(75,0,130)",
     "rgb(0,0,205)",
     "rgb(0,0,128)",
-    "rgb(25,25,112)"
+    "rgb(25,25,112)",
+    NULL  // End marker
 };
 
 const char* const BisexualLighting[] = {
@@ -31,7 +32,8 @@ const char* const BisexualLighting[] = {
     "rgb(135,206,250)",
     "rgb(224,255,255)",
     "rgb(0,255,255)",
-    "rgb(0,139,139)"
+    "rgb(0,139,139)",
+    NULL  // End marker
 };
 
 const char* const bootswatch[] = {
@@ -39,8 +41,8 @@ const char* const bootswatch[] = {
     "rgb(255, 220, 106)",
     "rgb(209, 0, 52)",
     "rgb(75,0,130)",
-    "rgb(0, 0, 97)"
-    //"rgb(0,0,0)",
+    "rgb(0, 0, 97)",
+    NULL  // End marker
 };
 
 #endif // SWATCHES_H

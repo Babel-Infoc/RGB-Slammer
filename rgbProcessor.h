@@ -44,7 +44,6 @@ const uint8_t gamma8[] = {
 //    15,  14,  13,  12,  11,  10,  9,   8,   7,   6,   5,   4,   3,   2,   1,   0
 //};
 
-
 // MARK: ------------------------------ RGB Processing ------------------------------
 // Convert the rgb or rgba string to an RGB Array
 void rgbStringToArray(const char* rgbString, int rgbArray[3]) {
@@ -56,13 +55,13 @@ void rgbStringToArray(const char* rgbString, int rgbArray[3]) {
 
 // MARK: ------------------------------ RGB Processing ------------------------------
 // Function to process the raw RGB values to accurate and consistent luminosity and hue
-void sendToRGB(const ledSegment led, const int RGBValue[]) {
+void sendToRGB(const int ledIndex, const int rgbValue[3]) {
     float rRatio, gRatio, bRatio;
     int tunedRGB[3];
 
     // Write the end color to the handover color matching the led segment
     for (int i = 0; i < 3; i++) {
-        handoverColor[led.ledNum][i] = RGBValue[i];
+        handoverColor[ledIndex][i] = rgbValue[i];
     }
 
     // Attenuate RGB values by the LEDs documented luminous intensity at the specified mA value
@@ -80,16 +79,15 @@ void sendToRGB(const ledSegment led, const int RGBValue[]) {
     }
     // Adjust the RGB values by the luminosity ratios, the brightness modifier, and apply gamma correction
     for (int i = 0; i < 3; i++) {
-        tunedRGB[i] = gamma8[(int)((RGBValue[i] * tuneRatio[i]) * maxBrightness)];
+        tunedRGB[i] = gamma8[(int)((rgbValue[i] * tuneRatio[i]) * maxBrightness)];
     }
 
     // Output the final values to the LED array
     for (int i = 0; i < 100; i++) {
-        digitalWrite(led.redPin, i < tunedRGB[0] ?      LOW : HIGH);
-        digitalWrite(led.greenPin, i < tunedRGB[1] ?    LOW : HIGH);
-        digitalWrite(led.bluePin, i < tunedRGB[2] ?     LOW : HIGH);
+        digitalWrite(leds[ledIndex].redPin, i < tunedRGB[0] ?      LOW : HIGH);
+        digitalWrite(leds[ledIndex].greenPin, i < tunedRGB[1] ?    LOW : HIGH);
+        digitalWrite(leds[ledIndex].bluePin, i < tunedRGB[2] ?     LOW : HIGH);
     }
 }
-
 
 #endif // RGBPROCESSOR_H

@@ -5,18 +5,20 @@
 
 // MARK: ------------------------------ Variables and config ------------------------------
 
-// Define each of the RGB Array pins, { segment number, R, G, B }
-ledSegment led1 = {0, PD5, PD3, PD4};
-ledSegment led2 = {1, PC5, PC6, PC4};
+// The `leds` array contains the pin configurations for different LEDs.
+// Each element in the array represents a different LED with its associated pins.
+led_t leds[] = {
+    {PD5, PD3, PD4},  // LED segment 0
+    {PC5, PC6, PC4}   // LED segment 1
+};
 
 // Automatically calculate the number of segments
-// Note: If you have more than 2, some andimation subroutines will need to be manually modified with more color arguments
-extern const ledSegment leds[] = {led1, led2};
-extern const int numSegments = sizeof(leds) / sizeof(leds[0]);
+// Note: If you have more than 2, some animation subroutines will need to be manually modified with more color arguments
+const int numLEDs = sizeof(leds) / sizeof(leds[0]);
 
 // Global variable definitions
-extern int handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}}; // Definition for extern variable from types.h
-extern const float maxBrightness = 0.8; // Maximum brightness modifier, 0-100
+int handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}}; // Definition for extern variable from types.h
+const float maxBrightness = 0.8; // Maximum brightness modifier, 0-100
 // MARK: ToDo: Add an ambient brightness modifier
 
 // Luminosity modifiers
@@ -24,19 +26,19 @@ extern const float maxBrightness = 0.8; // Maximum brightness modifier, 0-100
 // Check your LEDs datasheet for typical luminosity values at different currents
 // C2942981 - 20mA - R240, G=450, B=130
 //https://www.lcsc.com/datasheet/lcsc_datasheet_2410121913_Lite-On-LTST-S33FBEGW-SN_C2942981.pdf
-extern const luminance redLum       = {8, 52};
-extern const luminance greenLum     = {5, 163};
-extern const luminance blueLum      = {3, 18};
+const luminance redLum       = {8, 52};
+const luminance greenLum     = {5, 163};
+const luminance blueLum      = {3, 18};
 
 // Declare the gamma correction array
 extern const uint8_t gamma8[];
 
 // MARK: ------------------------------ Startup operations ------------------------------
 void setup() {
-    for (int i = 0; i < numSegments; i++) {
-        pinMode(leds[i].redPin,     OUTPUT);
-        pinMode(leds[i].greenPin,   OUTPUT);
-        pinMode(leds[i].bluePin,    OUTPUT);
+    for (int i = 0; i < numLEDs; i++) {
+        pinMode(leds[i].redPin, OUTPUT);
+        pinMode(leds[i].greenPin, OUTPUT);
+        pinMode(leds[i].bluePin, OUTPUT);
     }
     startup();
     //delay(1000);
@@ -47,13 +49,13 @@ void setup() {
 =======================================================================================*/
 
 void loop() {
-    //startup();
-    //fadeToColor        ("rgb(0, 160, 223)",        "rgba(0, 0, 255, 0.84)",     200);
-    //strobe              ("rgb(255,0,0)",        "rgb(30,30,50)", 70, 2);
-    neonFlicker         ("rgb(122, 217, 255)",        "rgb(52, 91, 107)", 70,  5,  10000);
-    //progressiveFade     (Anodize,            2000, 1);
-    randomFade          (bootswatch,               50, 1000, 10);
-    //pulseColor          ("rgb(175,238,238)",    "rgb(0,128,128)",   200, 2);
+    startup();
+    fadeToColor        ("rgb(0, 160, 223)",        "rgba(0, 0, 255, 0.84)",     200);
+    strobe              ("rgb(255,0,0)",        "rgb(30,30,50)", 70, 2);
+    neonFlicker         ("rgb(180, 234, 255)",        "rgb(93, 159, 185)", 70,  10,  5000);
+    randomFade          (Anodize,   50,     500,   20);
+    progressiveFade     (bootswatch, 10000, 20);
+    pulseColor          ("rgb(175,238,238)",    "rgb(0,128,128)",   200, 2);
 }
 
 /*=======================================================================================
@@ -62,8 +64,6 @@ void loop() {
 
 // MARK: ------------------------------ Animation loops -----------------------------
 /*
-    ========= Animation loop reference =========
-
     pulseColor
         Pulses between two colors <highColor> and <lowColor> for <speed> milliseconds, for <reps> number of times
         (<highColor>, <lowColor>, <speed>, <reps>);
@@ -90,6 +90,7 @@ void loop() {
         A predefined startup animation with no variables, modify this to your liking
 */
 
+// MARK: pulseColor
 void pulseColor(const char* highColor, const char* lowColor, const int speed, const int reps){
     for (int j = 0; j < reps; j++) {
         fadeToColor(highColor, highColor, speed/6);
@@ -98,28 +99,47 @@ void pulseColor(const char* highColor, const char* lowColor, const int speed, co
     }
 }
 
-void randomFade(const char* const* swatch, const int maxspeed, const int minspeed, const int reps) {
-    int swatchSize = sizeof(swatch) / sizeof(swatch[0]);
-    for (int j = 0; j < reps; j++) {
-        int SW1 = random(0, swatchSize);
-        int SW2 = random(0, swatchSize);
-        int fadeTime = random(minspeed, maxspeed);
-        fadeToColor(swatch[SW1], swatch[SW2], fadeTime);
+// MARK: progressiveFade
+void progressiveFade(const char* swatch[], const int speed, const int reps) {
+    // Count the number of colors in the swatch (until NULL)
+    int swatchSize = 0;
+    while (swatch[swatchSize] != NULL) {
+        swatchSize++;
     }
-}
 
-void progressiveFade(const char* const* swatch, const int speed, const int reps) {
-    int swatchSize = sizeof(swatch) / sizeof(swatch[0]);
     const int fadeTime = speed / swatchSize;
     for (int j = 0; j < reps; j++) {
         for (int k = 0; k < swatchSize; k++) {
-            fadeToColor(swatch[k],      swatch[(k + 1) % swatchSize], fadeTime);
+            fadeToColor(swatch[k], swatch[k], fadeTime);
         }
     }
 }
 
+// MARK: randomFade
+void randomFade(const char* swatch[], const int maxspeed, const int minspeed, const int reps) {
+    // Count the number of colors in the swatch (until NULL)
+    int swatchSize = 0;
+    while (swatch[swatchSize] != NULL) {
+        swatchSize++;
+    }
+
+    // Perform random fades for the specified number of reps
+    for (int j = 0; j < reps; j++) {
+        // Select two random colors from the swatch
+        int randomIndex1 = random(0, swatchSize);
+        int randomIndex2 = random(0, swatchSize);
+
+        // Calculate a random fade time between minspeed and maxspeed
+        int randomSpeed = random(minspeed, maxspeed + 1);
+
+        // Fade between the two random colors
+        fadeToColor(swatch[randomIndex1], swatch[randomIndex2], randomSpeed);
+    }
+}
+
+// MARK: strobe
 void strobe(const char* color1, const char* color2, const int speed, const int reps) {
-    for (int i = 0; i < numSegments; i++) {
+    for (int i = 0; i < numLEDs; i++) {
         for (int j = 0; j < reps; j++) {
             showColor(color1,    color2,  speed);
             showColor(color2,    color2,  speed);
@@ -134,7 +154,12 @@ void strobe(const char* color1, const char* color2, const int speed, const int r
 }
 
 void startup(){
-    int swatchSize = sizeof(bootswatch) / sizeof(bootswatch[0]);
+    // Count the number of colors in the swatch (until NULL)
+    int swatchSize = 0;
+    while (bootswatch[swatchSize] != NULL) {
+        swatchSize++;
+    }
+
     int speed = 50;
     for (int j = 0; j < 3; j++) {
         for (int k = 0; k < swatchSize; k++) {
@@ -161,6 +186,10 @@ void startup(){
     slamFade
         For both LED channels, jumps to <startColor>, then fades to <endColor>, over <fadeTime> milliseconds
         (<startColor>, <endColor>, <fadeTime>);
+
+    neonFlicker
+        Simulates a neon / fluorescent light flicker
+        (<mainColor>, <flickerColor>, <intensity>, <chance>, <duration>);
 */
 
 // MARK: showColor
@@ -173,11 +202,12 @@ void showColor(const char* color1, const char* color2, const int hangTime) {
 
     unsigned long startTime = millis();
     while (millis() - startTime < hangTime) {
-        sendToRGB(leds[0], rgbColor1);
-        sendToRGB(leds[1], rgbColor2);
+        sendToRGB(0, rgbColor1);
+        sendToRGB(1, rgbColor2);
     }
 }
 
+// MARK: fadeToColor
 void fadeToColor(const char* color1, const char* color2, const int fadeTime) {
     int startColor[2][3];
     int endColor[2][3];
@@ -201,8 +231,8 @@ void fadeToColor(const char* color1, const char* color2, const int fadeTime) {
                 output[i][j] = startColor[i][j] + (endColor[i][j] - startColor[i][j]) * fadeRatio;
             }
         }
-        for (int i = 0; i < numSegments; i++) {
-            sendToRGB(leds[i], output[i]);
+        for (int i = 0; i < numLEDs; i++) {
+            sendToRGB(i, output[i]);
         }
     }
 }
@@ -222,8 +252,8 @@ void slamFade(const char* startColor, const char* endColor, const int fadeTime) 
         for (int i = 0; i < 3; i++) {
             output[i] = startColorArray[i] + (endColorArray[i] - startColorArray[i]) * fadeRatio;
         }
-        for (int i = 0; i < numSegments; i++) {
-            sendToRGB(leds[i], output);
+        for (int i = 0; i < numLEDs; i++) {
+            sendToRGB(i, output);
         }
     }
 }
@@ -234,23 +264,24 @@ void neonFlicker(const char* mainColor, const char* flickerColor, const int inte
     int mainRGB[3];
     int flickerRGB[3];
     int flickerOutput[3];
+    int flickerTime = 20;
     rgbStringToArray(mainColor, mainRGB);
     rgbStringToArray(flickerColor, flickerRGB);
 
-    unsigned long endTime = millis() + duration;
-    while (millis() < endTime) {
-        for (int j = 0; j < numSegments; j++) {
+    unsigned long startTime = millis();
+    while (millis() - startTime < duration) {
+        for (int j = 0; j < numLEDs; j++) {
             bool shouldFlicker = random(0, 100) < chance;
             if (shouldFlicker) {
                 int flickerInt = random(0, intensity);
                 for (int r = 0; r < 3; r++) {
                     flickerOutput[r] = constrain(mainRGB[r] + ((flickerRGB[r] - mainRGB[r]) * flickerInt) / 100, 0, 255);
                 }
-                sendToRGB(leds[j], flickerOutput);
+                sendToRGB(j, flickerOutput);
             } else {
-                sendToRGB(leds[j], mainRGB);
+                sendToRGB(j, mainRGB);
             }
         }
-        delay(20);
+        delay(flickerTime);
     }
 }
