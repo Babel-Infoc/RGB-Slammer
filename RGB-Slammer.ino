@@ -50,9 +50,9 @@ void loop() {
     //startup();
     //fadeToColor        ("rgb(0, 160, 223)",        "rgba(0, 0, 255, 0.84)",     200);
     //strobe              ("rgb(255,0,0)",        "rgb(30,30,50)", 70, 2);
-    neonFlicker         ("rgb(122, 217, 255)",        "rgb(52, 91, 107)", 70,  5,  1000);
+    neonFlicker         ("rgb(122, 217, 255)",        "rgb(52, 91, 107)", 70,  5,  10000);
     //progressiveFade     (Anodize,            2000, 1);
-    //randomFade          (Anodize,               50, 1000, 10);
+    randomFade          (bootswatch,               50, 1000, 10);
     //pulseColor          ("rgb(175,238,238)",    "rgb(0,128,128)",   200, 2);
 }
 
@@ -178,39 +178,6 @@ void showColor(const char* color1, const char* color2, const int hangTime) {
     }
 }
 
-/*
-// MARK: fadeToColor
-// Fades from the most recent color displayed before this function, to the endColor, over the fadeTime
-void fadeToColor(const char* color1, const char* color2, const int fadeTime) {
-    // Define the color arrays for each segment
-    const int colorArray[numSegments][3];
-    int startColor[numSegments][3];
-    int rgbProgress[numSegments][3];
-
-    // Convert the color strings to RGB arrays
-    rgbStringToArray(color1, color[0][3]);
-    rgbStringToArray(color2, color[1][3]);
-
-    // Pull the start color from the most recent handover
-    for (int r = 0; r < numSegments; r++) {
-        for (int i = 0; i < 3; i++) {
-            startColor[r][i] = handoverColor[r][i];
-        }
-    }
-
-    // For <fadeTime>...
-    unsigned long startTime = millis();
-    while (millis() - startTime < fadeTime) {
-        float fadeRatio = (float)(millis() - startTime) / fadeTime;
-        for (int r = 0; r < numSegments; r++) {
-            for (int i = 0; i < 3; i++) {
-                rgbProgress[r][i] = startColor[r][i] + (color[r][i] - startColor[r][i]) * fadeRatio;
-            }
-            sendToRGB(leds[r], rgbProgress[r]);
-        }
-    }
-}*/
-
 void fadeToColor(const char* color1, const char* color2, const int fadeTime) {
     int startColor[2][3];
     int endColor[2][3];
@@ -277,7 +244,7 @@ void neonFlicker(const char* mainColor, const char* flickerColor, const int inte
             if (shouldFlicker) {
                 int flickerInt = random(0, intensity);
                 for (int r = 0; r < 3; r++) {
-                    flickerOutput[r] = mainRGB[r] + ((flickerRGB[r] - mainRGB[r]) * flickerInt) / 100;
+                    flickerOutput[r] = constrain(mainRGB[r] + ((flickerRGB[r] - mainRGB[r]) * flickerInt) / 100, 0, 255);
                 }
                 sendToRGB(leds[j], flickerOutput);
             } else {
