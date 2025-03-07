@@ -2,6 +2,22 @@
 #define SWATCHES_H
 
 // Define color arrays
+
+const char* const mainSwatch[] = {
+    "rgb(255,255,0)",
+    "rgb(255,215,0)",
+    "rgb(255,165,0)",
+    "rgb(255,140,0)",
+    "rgb(210,105,30)",
+    "rgb(255,69,0)",
+    "rgb(255,0,255)",
+    "rgb(153,50,204)",
+    "rgb(138,43,226)",
+    "rgb(75,0,130)",
+    "rgb(0, 0, 97)",
+    NULL  // End marker
+};
+
 const char* const Anodize[] = {
     "rgb(255,255,0)",
     "rgb(255,215,0)",
@@ -13,9 +29,7 @@ const char* const Anodize[] = {
     "rgb(153,50,204)",
     "rgb(138,43,226)",
     "rgb(75,0,130)",
-    "rgb(0,0,205)",
-    "rgb(0,0,128)",
-    "rgb(25,25,112)",
+    "rgb(0, 0, 97)",
     NULL  // End marker
 };
 
