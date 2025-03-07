@@ -15,16 +15,21 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
     Makes the script compatible with the <a href="https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token">json-color-token</a> plugin (see Useful tools below)
 - ### Multiple simultaneous LED segments
     Can be configured for separate colors and animations, which will all run simultaneously, no `delay` pauses
+- ### Automatic color tuning
+    All RGB LEDs's have slightly different percieved brightness and between the red green and blue elements when provided the same power, which can affect the white tone and colour accuracy. Automatic color tuning is achieved by entering the typical mA and Luminance value for `redLum`, `greenLum`, and `blueLum` according to your LED's datasheet.
+- ### Gamma correction
+    Fix the percieved LED brightness curve using <a href="https://learn.adafruit.com/led-tricks-gamma-correction/">Phillip Burgess' fix</a>
+- ### Preconfigured animations
+    Included is a number of preconfigured animation elements and longer animation cycles, which are easily configured using main loop arguments
+- ### Swatch arrays
+    Iterate or randomize animation colors through customisable swatches. Create or modify swatches in the swatches.h header file.
 - ### Max output brightness
     `maxBrightness` float that can be configured between 0 and 1
 - ### Ambient brightness
+    (feature in progress)
     `ambientBrightness` float that can be modified by a light sensor if you have one
-- ### Color tuning
-    All RGB's have slightly different percieved brightness between the red green and blue elements when provided the same power, adjust the mA and Luminance value for redLum, greenLum, and blueLum according to your LED's datasheet to even brightness and true neutral white
-- ### Gamma correction
-    Fix the percieved LED brightness curve using <a href="https://learn.adafruit.com/led-tricks-gamma-correction/">Phillip Burgess' fix</a>
-- ### Swatch arrays
-    Iterate or randomize animation colors through customisable swatches. Create or modify swatches in the swatches.h header file.
+- ### Button input color / animation
+    (feature in progress)
 - ### Handover color
     Some animation subroutines are designed to fade in or interact with the last color displayed by the previous subroutine, as such all subroutines store their last RGB color in segment specific variables called handoverColor
 
