@@ -3,6 +3,16 @@
 #include "swatches.h"
 #include "rgbProcessor.h"
 
+/*
+    RGB Slammer
+    Written by Tully Jagoe 2025
+    MIT License
+
+    This script is best edited in VSCode, using the following extensions:
+    For visualising / selecting color strings:
+    https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token
+*/
+
 // MARK: ------------------------------ Variables and config ------------------------------
 
 // The `leds` array contains the pin configurations for different LEDs.
@@ -12,14 +22,22 @@ led_t leds[] = {
     {PC5, PC6, PC4}   // LED segment 1
 };
 
+// Animation and Color select button pins
+int animBtn = PC0;
+int colrBtn = PC3;
+
 // Automatically calculate the number of segments
 // Note: If you have more than 2, some animation subroutines will need to be manually modified with more color arguments
 const int numLEDs = sizeof(leds) / sizeof(leds[0]);
 
 // Global variable definitions
 int handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}}; // Definition for extern variable from types.h
-const float maxBrightness = 0.8; // Maximum brightness modifier, 0-100
+const float maxBrightness = 0.5; // Maximum brightness modifier, 0-100
 // MARK: ToDo: Add an ambient brightness modifier
+
+// Current color swatch
+const int mainSwatchSize = 11;
+int mainSwatchIndex = 0;
 
 // Luminosity modifiers
 // Define the light intensity of each LED color at the specified mA value
@@ -40,6 +58,8 @@ void setup() {
         pinMode(leds[i].greenPin, OUTPUT);
         pinMode(leds[i].bluePin, OUTPUT);
     }
+    pinMode(animBtn, INPUT_PULLUP);
+    pinMode(colrBtn, INPUT_PULLUP);
     startup();
     //delay(1000);
 }
@@ -49,20 +69,22 @@ void setup() {
 =======================================================================================*/
 
 void loop() {
-    startup();
-    fadeToColor        ("rgb(0, 160, 223)",        "rgba(0, 0, 255, 0.84)",     200);
-    strobe              ("rgb(255,0,0)",        "rgb(30,30,50)", 70, 2);
-    neonFlicker         ("rgb(180, 234, 255)",        "rgb(93, 159, 185)", 70,  10,  5000);
-    randomFade          (Anodize,   50,     500,   20);
-    progressiveFade     (bootswatch, 10000, 20);
-    pulseColor          ("rgb(175,238,238)",    "rgb(0,128,128)",   200, 2);
+    // Check for button presses
+    checkColorButton();
+
+    //progressiveFade     (bootswatch, 10000, 20);
+    //strobe              ("rgb(255,0,0)",        "rgb(30,30,50)", 70, 2);
+    neonFlicker         ("rgb(180, 234, 255)", 50,  10,  5000);
+    //randomFade          (Anodize,   50,     500,   20);
+    //pulseColor          ("rgb(175,238,238)",    "rgb(0,128,128)",   200, 2);
+    //startup();
 }
 
 /*=======================================================================================
 //                                    End main loop                                    //
 =======================================================================================*/
 
-// MARK: ------------------------------ Animation loops -----------------------------
+// MARK: --- Animation loops ---
 /*
     pulseColor
         Pulses between two colors <highColor> and <lowColor> for <speed> milliseconds, for <reps> number of times
@@ -110,7 +132,7 @@ void progressiveFade(const char* swatch[], const int speed, const int reps) {
     const int fadeTime = speed / swatchSize;
     for (int j = 0; j < reps; j++) {
         for (int k = 0; k < swatchSize; k++) {
-            fadeToColor(swatch[k], swatch[k], fadeTime);
+            fadeToColor(swatch[k], swatch[(k + 1) % swatchSize], fadeTime);
         }
     }
 }
@@ -153,6 +175,32 @@ void strobe(const char* color1, const char* color2, const int speed, const int r
     }
 }
 
+// MARK: neonFlicker
+void neonFlicker(const char* mainColor, const int intensity, const int chance, const int duration) {
+    int mainRGB[3];
+    int flickerOutput[3];
+    int flickerTime = 20;
+    rgbStringToArray(mainColor, mainRGB);
+
+    unsigned long startTime = millis();
+    while (millis() - startTime < duration) {
+        for (int j = 0; j < numLEDs; j++) {
+            bool flickerChance = random(0, 100) < chance;
+            if (flickerChance) {
+                int flickerInt = random(1, intensity + 1); // Ensure non-zero value
+                for (int r = 0; r < 3; r++) {
+                    // Reduce brightness by dividing by flickerInt
+                    flickerOutput[r] = constrain(mainRGB[r] / flickerInt, 0, 255);
+                }
+                sendToRGB(j, flickerOutput);
+            } else {
+                sendToRGB(j, mainRGB);
+            }
+        }
+        delay(flickerTime);
+    }
+}
+
 void startup(){
     // Count the number of colors in the swatch (until NULL)
     int swatchSize = 0;
@@ -170,7 +218,7 @@ void startup(){
     fadeToColor("rgb(0,0,0)", "rgb(0,0,0)", speed*6);
 }
 
-// MARK: ------------------------------ Animation Elements ------------------------------
+// MARK: --- Animation Elements ---
 /*
     ========= Animation subroutine reference =========
     showColor
@@ -182,10 +230,6 @@ void startup(){
         Fades from  the last <handoverColor> to <colorx> over <fade time> milliseconds
         <color1> and <color2> correspond to segments led1 and led2
         (<color1>, <color2>, <fade time>);
-
-    slamFade
-        For both LED channels, jumps to <startColor>, then fades to <endColor>, over <fadeTime> milliseconds
-        (<startColor>, <endColor>, <fadeTime>);
 
     neonFlicker
         Simulates a neon / fluorescent light flicker
@@ -237,51 +281,41 @@ void fadeToColor(const char* color1, const char* color2, const int fadeTime) {
     }
 }
 
-// MARK: slamFade
-// Fades from the startColor to the endColor over the time specified
-void slamFade(const char* startColor, const char* endColor, const int fadeTime) {
-    int startColorArray[3];
-    int endColorArray[3];
-    int output[3];
-    rgbStringToArray(startColor, startColorArray);
-    rgbStringToArray(endColor, endColorArray);
+// MARK: --- Button Handling ---
 
-    unsigned long startTime = millis();
-    while (millis() - startTime < fadeTime) {
-        float fadeRatio = (float)(millis() - startTime) / fadeTime;
-        for (int i = 0; i < 3; i++) {
-            output[i] = startColorArray[i] + (endColorArray[i] - startColorArray[i]) * fadeRatio;
-        }
-        for (int i = 0; i < numLEDs; i++) {
-            sendToRGB(i, output);
-        }
+// Variables for button debouncing
+unsigned long lastColorButtonDebounceTime = 0;
+int lastColorButtonState = HIGH; // Using INPUT_PULLUP, so default is HIGH
+const int debounceDelay = 50; // Debounce time in milliseconds
+
+// Function to check if color button has been pressed
+void checkColorButton() {
+    // Read the current button state
+    int currentButtonState = digitalRead(colrBtn);
+
+    // Check if the button state has changed
+    if (currentButtonState != lastColorButtonState) {
+        // Reset the debouncing timer
+        lastColorButtonDebounceTime = millis();
     }
-}
 
-// MARK: neonFlicker
-// Simulates a failing neon / fluorescent light flicker, adjust intensity and chance of flicker events
-void neonFlicker(const char* mainColor, const char* flickerColor, const int intensity, const int chance, const int duration) {
-    int mainRGB[3];
-    int flickerRGB[3];
-    int flickerOutput[3];
-    int flickerTime = 20;
-    rgbStringToArray(mainColor, mainRGB);
-    rgbStringToArray(flickerColor, flickerRGB);
+    // Check if enough time has passed since the last state change
+    if ((millis() - lastColorButtonDebounceTime) > debounceDelay) {
+        // If the button state has changed and is now LOW (pressed)
+        if (currentButtonState == LOW && lastColorButtonState == HIGH) {
+            // Increment the swatch index
+            mainSwatchIndex++;
 
-    unsigned long startTime = millis();
-    while (millis() - startTime < duration) {
-        for (int j = 0; j < numLEDs; j++) {
-            bool shouldFlicker = random(0, 100) < chance;
-            if (shouldFlicker) {
-                int flickerInt = random(0, intensity);
-                for (int r = 0; r < 3; r++) {
-                    flickerOutput[r] = constrain(mainRGB[r] + ((flickerRGB[r] - mainRGB[r]) * flickerInt) / 100, 0, 255);
-                }
-                sendToRGB(j, flickerOutput);
-            } else {
-                sendToRGB(j, mainRGB);
+            // Wrap around if exceeded the maximum
+            if (mainSwatchIndex >= mainSwatchSize) {
+                mainSwatchIndex = 0;
             }
+
+            // You could add some visual feedback here to indicate the swatch changed
+            // For example, a brief flash of the new color
         }
-        delay(flickerTime);
     }
+
+    // Save the current button state for next comparison
+    lastColorButtonState = currentButtonState;
 }
