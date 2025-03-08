@@ -77,15 +77,13 @@ void setup() {
 =======================================================================================*/
 
 void loop() {
-    //if (animIndex == 0) {
-    //    startup();
-    //} else if (animIndex == 1) {
-    //    neonFlicker(50, 10);
-    //} else if (animIndex == 2) {
-        pulseColor(200);
-    //} else if (animIndex == 3) {
-    //    progressiveFade(500);
-    //}
+    switch (animIndex) {
+        case 0: pulseColor(200); break;
+        case 1: neonFlicker(10); break;
+        case 2: progressiveFade(500); break;
+        case 3: randomFade(500, 200); break;
+        default: pulseColor(200); break;
+    }
 }
 
 /*=======================================================================================
@@ -140,7 +138,7 @@ void progressiveFade(const int speed) {
 }
 
 // MARK: randomFade
-void randomFade(const int maxspeed, const int minspeed) {
+void randomFade(const int min, const int max) {
     const char* randColorArray[4] = {
         currentSwatch.highlight,
         currentSwatch.primary,
@@ -149,35 +147,25 @@ void randomFade(const int maxspeed, const int minspeed) {
     };
     int rand1 = random(0, swatchSize);
     int rand2 = random(0, swatchSize);
-    int randSpeed = random(minspeed, maxspeed + 1);
+    int randSpeed = random(min, max);
     fadeToColor(randColorArray[rand1], randColorArray[rand2], randSpeed);
 }
 
 // MARK: neonFlicker
-void neonFlicker(const int intensity, const int chance) {
-    int highlight[3];
+void neonFlicker(const int chance) {
     int primary[3];
-    int accent[3];
     int background[3];
-
     int flickerOutput[3];
 
-    rgbStringToArray(currentSwatch.highlight, highlight);
     rgbStringToArray(currentSwatch.primary, primary);
-    rgbStringToArray(currentSwatch.accent, accent);
     rgbStringToArray(currentSwatch.background, background);
 
     for (uint8_t segment = 0; segment < 2; segment++) {
         if (random(100) < chance) {
-            int flickerInt = random(1, intensity + 1); // Ensure non-zero value
-            // Mix primary and background colors, at intensity
-            for (int channel = 0; channel < 3; channel++) {
-                flickerOutput[channel] = constrain(primary[channel] / flickerInt + background[channel], 0, 255);
-            }
-            sendToRGB(segment, flickerOutput);
+            sendToRGB(segment, background);
+        } else {
+            sendToRGB(segment, primary);
         }
-        // If the flicker is not successful, stay on the primary color
-        sendToRGB(segment, primary);
     }
 }
 
@@ -205,10 +193,6 @@ void startup(){
         Fades from  the last <handoverColor> to <colorx> over <fade time> milliseconds
         <color1> and <color2> correspond to segments led1 and led2
         (<color1>, <color2>, <fade time>);
-
-    neonFlicker
-        Simulates a neon / fluorescent light flicker
-        (<mainColor>, <flickerColor>, <intensity>, <chance>, <duration>);
 */
 
 // MARK: showColor
