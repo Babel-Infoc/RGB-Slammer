@@ -1,3 +1,6 @@
 {
-    "recommendations": ["kyechunan.json-color-token"]
+    "recommendations": [
+        "kyechunan.json-color-token",
+        "vscode-arduino.vscode-arduino-community"
+    ]
 }
