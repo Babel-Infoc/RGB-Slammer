@@ -3,19 +3,23 @@
 
 // Define color arrays
 
-const char* const mainSwatch[] = {
-    "rgb(255,255,0)",
-    "rgb(255,215,0)",
-    "rgb(255,165,0)",
-    "rgb(255,140,0)",
-    "rgb(210,105,30)",
-    "rgb(255,69,0)",
-    "rgb(255,0,255)",
-    "rgb(153,50,204)",
-    "rgb(138,43,226)",
-    "rgb(75,0,130)",
-    "rgb(0, 0, 97)",
-    NULL  // End marker
+struct pairedSwatch {
+    const char* primary;
+    const char* secondary;
+};
+
+const pairedSwatch mainSwatch[] = {
+    {"rgb(255,255,0)",      "rgb(128,128,0)"},
+    {"rgb(255,215,0)",      "rgb(128,108,0)"},
+    {"rgb(255,165,0)",      "rgb(128,83,0)"},
+    {"rgb(255,140,0)",      "rgb(128,70,0)"},
+    {"rgb(210,105,30)",     "rgb(105,53,15)"},
+    {"rgb(255,69,0)",       "rgb(128,35,0)"},
+    {"rgb(255,0,255)",      "rgb(128,0,128)"},
+    {"rgb(153,50,204)",     "rgb(77,25,102)"},
+    {"rgb(138,43,226)",     "rgb(69,22,113)"},
+    {"rgb(75,0,130)",       "rgb(38,0,65)"},
+    {"rgb(0,0,97)",         "rgb(0,0,49)"},
 };
 
 const char* const Anodize[] = {
