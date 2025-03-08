@@ -16,7 +16,7 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
 - ### Multiple simultaneous LED segments
     Can be configured for separate colors and animations, which will all run simultaneously, no `delay` pauses
 - ### Automatic color tuning
-    All RGB LEDs's have slightly different percieved brightness and between the red green and blue elements when provided the same power, which can affect the white tone and colour accuracy. Automatic color tuning is achieved by entering the typical mA and Luminance value for `redLum`, `greenLum`, and `blueLum` according to your LED's datasheet.
+    All RGB LEDs's have slightly different percieved brightness and between the red green and blue elements when provided the same power, which can affect the white tone and colour accuracy. Automatic color tuning is achieved by entering the typical mA and Luminance value for `red`, `green`, and `blue` according to your LED's datasheet.
 - ### Gamma correction
     Fix the percieved LED brightness curve using <a href="https://learn.adafruit.com/led-tricks-gamma-correction/">Phillip Burgess' fix</a>
 - ### Preconfigured animations
