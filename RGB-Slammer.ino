@@ -52,6 +52,12 @@ void setup() {
     // Get the number of swatches in the swatchArray
     int swatchArraySize = sizeof(swatchArray) / sizeof(swatch);
 
+    // Initialize currentSwatch with the first swatch from the array
+    currentSwatch.highlight = swatchArray[0].highlight;
+    currentSwatch.primary = swatchArray[0].primary;
+    currentSwatch.accent = swatchArray[0].accent;
+    currentSwatch.background = swatchArray[0].background;
+
     // Set up all LED segments
     for (int segment = 0; segment < 2; segment++) {
         for (int pin = 0; pin < 3; pin++) {
@@ -117,29 +123,29 @@ void loop() {
 // MARK: pulseColor
 void pulseColor(const int speed){
     // Pulse between primary and accent colors
-    fadeToColor(currentSwatch->highlight,   currentSwatch->highlight,   speed/6);
-    fadeToColor(currentSwatch->primary,     currentSwatch->primary,     speed);
-    fadeToColor(currentSwatch->accent,      currentSwatch->accent,      speed);
-    fadeToColor(currentSwatch->primary,     currentSwatch->primary,     speed*3);
+    fadeToColor(currentSwatch.highlight, currentSwatch.highlight, speed/6);
+    fadeToColor(currentSwatch.primary, currentSwatch.primary, speed);
+    fadeToColor(currentSwatch.accent, currentSwatch.accent, speed);
+    fadeToColor(currentSwatch.primary, currentSwatch.primary, speed*3);
 }
 
 // MARK: progressiveFade
 void progressiveFade(const int speed) {
    // Over <speed> milliseconds, fade through all colors in currentSwatch in order
     const int fadeTime = speed / 4; // 4 colors in the swatch
-    fadeToColor(currentSwatch->highlight,   currentSwatch->highlight,   fadeTime);
-    fadeToColor(currentSwatch->primary,     currentSwatch->primary,     fadeTime);
-    fadeToColor(currentSwatch->accent,      currentSwatch->accent,      fadeTime);
-    fadeToColor(currentSwatch->background,  currentSwatch->background,  fadeTime);
+    fadeToColor(currentSwatch.highlight, currentSwatch.highlight, fadeTime);
+    fadeToColor(currentSwatch.primary, currentSwatch.primary, fadeTime);
+    fadeToColor(currentSwatch.accent, currentSwatch.accent, fadeTime);
+    fadeToColor(currentSwatch.background, currentSwatch.background, fadeTime);
 }
 
 // MARK: randomFade
 void randomFade(const int maxspeed, const int minspeed) {
-    char* randColorArray[4] = {
-        currentSwatch->highlight,
-        currentSwatch->primary,
-        currentSwatch->accent,
-        currentSwatch->background
+    const char* randColorArray[4] = {
+        currentSwatch.highlight,
+        currentSwatch.primary,
+        currentSwatch.accent,
+        currentSwatch.background
     };
     int rand1 = random(0, swatchSize);
     int rand2 = random(0, swatchSize);
@@ -156,10 +162,10 @@ void neonFlicker(const int intensity, const int chance) {
 
     int flickerOutput[3];
 
-    rgbStringToArray(currentSwatch->highlight, highlight);
-    rgbStringToArray(currentSwatch->primary, primary);
-    rgbStringToArray(currentSwatch->accent, accent);
-    rgbStringToArray(currentSwatch->background, background);
+    rgbStringToArray(currentSwatch.highlight, highlight);
+    rgbStringToArray(currentSwatch.primary, primary);
+    rgbStringToArray(currentSwatch.accent, accent);
+    rgbStringToArray(currentSwatch.background, background);
 
     for (uint8_t segment = 0; segment < 2; segment++) {
         if (random(100) < chance) {

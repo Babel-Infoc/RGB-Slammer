@@ -66,10 +66,10 @@ void checkColorButton() {
             swatchIndex = (swatchIndex + 1) % 6;
 
             // When color button is pressed, copy the selected swatch's colors to currentSwatch
-            currentSwatch->highlight = swatchArray[swatchIndex].highlight;
-            currentSwatch->primary = swatchArray[swatchIndex].primary;
-            currentSwatch->accent = swatchArray[swatchIndex].accent;
-            currentSwatch->background = swatchArray[swatchIndex].background;
+            currentSwatch.highlight = swatchArray[swatchIndex].highlight;
+            currentSwatch.primary = swatchArray[swatchIndex].primary;
+            currentSwatch.accent = swatchArray[swatchIndex].accent;
+            currentSwatch.background = swatchArray[swatchIndex].background;
         }
         // Save the current button state for next comparison
         colorButtonLastState = colorButtonState;

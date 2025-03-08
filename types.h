@@ -31,13 +31,17 @@ extern int handoverColor[2][3];
 // MARK: ------------------------------ Swatch Handling ------------------------------
 // Swatch struct
 struct swatch {
-    char* highlight;
-    char* primary;
-    char* accent;
-    char* background;
+    const char* highlight;
+    const char* primary;
+    const char* accent;
+    const char* background;
 
     // Default constructor
     swatch() : highlight(nullptr), primary(nullptr), accent(nullptr), background(nullptr) {}
+
+    // Constructor with parameters
+    swatch(const char* h, const char* p, const char* a, const char* b)
+        : highlight(h), primary(p), accent(a), background(b) {}
 };
 
 // Current color swatch index
@@ -45,7 +49,7 @@ extern int swatchIndex;
 extern int swatchArraySize;
 
 // Store the current swatch in a global variable
-struct swatch* currentSwatch;
+extern swatch currentSwatch;
 
 // MARK: ------------------------------ Button Handling ------------------------------
 // Current animation index
