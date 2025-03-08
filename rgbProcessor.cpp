@@ -52,8 +52,6 @@ const uint8_t gamma8[] = {
   252,255 };
 
 // MARK: ------------------------------ Button Handling ------------------------------
-
-// Function to check if color button has been pressed
 void checkColorButton() {
     // Read the current button state
     int colorButtonState = digitalRead(colorBtn);
