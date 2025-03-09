@@ -38,21 +38,18 @@ const uint8_t gamma8[] = {
 // MARK: Luminance Calculation ------------------------------
 // Function to calculate luminance ratios for consistent color output
 void calculateLuminance() {
-    // Convert to fixed-point to save flash by eliminating floating point operations
-    // Scale values by 256 for 8-bit fixed-point math
-    uint8_t rLum = (red.luminance << 8) / red.mA;
-    uint8_t gLum = (green.luminance << 8) / green.mA;
-    uint8_t bLum = (blue.luminance << 8) / blue.mA;
+    float rRatio, gRatio, bRatio;
+    float maxLum = max(max(red.luminance, green.luminance), blue.luminance);
+    rRatio    = (red.luminance / maxLum) / red.mA;
+    gRatio    = (green.luminance / maxLum) / green.mA;
+    bRatio    = (blue.luminance / maxLum) / blue.mA;
+    float tuneRatio[] = {rRatio, gRatio, bRatio};
 
-    // Find the maximum value
-    uint8_t maxLum = rLum;
-    if (gLum > maxLum) maxLum = gLum;
-    if (bLum > maxLum) maxLum = bLum;
-
-    // Calculate and store the tuning ratios
-    tuneRatio[0] = (float)maxLum / rLum;
-    tuneRatio[1] = (float)maxLum / gLum;
-    tuneRatio[2] = (float)maxLum / bLum;
+    // Get the highest Ratio value, adjust it up to 1, and adjust the other two ratios up at the same rate
+    float maxRatio = max(rRatio, max(gRatio, bRatio));
+    tuneRatio[0] = maxRatio / rRatio;
+    tuneRatio[1] = maxRatio / gRatio;
+    tuneRatio[2] = maxRatio / bRatio;
 }
 
 // MARK: Button Handling ------------------------------
@@ -79,23 +76,29 @@ void checkButtons() {
 // MARK: RGB Processing ------------------------------
 // Function to process the raw RGB values to accurate and consistent luminosity and hue
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
+    float rRatio, gRatio, bRatio;
     int tunedRGB[3];
 
-    // Save rgbValue to handoverColor
-    for (uint8_t pin = 0; pin < 3; pin++) {
-        handoverColor[segment][pin] = rgbValue[pin];
+    // Write the end color to the handover color matching the led segment
+    for (int i = 0; i < 3; i++) {
+        handoverColor[segment][i] = rgbValue[i];
     }
 
     // Calculate the brightness-adjusted and gamma-corrected values using global tuneRatio
     for (uint8_t pin = 0; pin < 3; pin++) {
-        tunedRGB[pin] = gamma8[(int)((rgbValue[pin] * tuneRatio[pin]) * (maxBrightness / 100.0f))];
+        tunedRGB[pin] = gamma8[(int)(rgbValue[pin] * tuneRatio[pin] * maxBrightness)];
     }
 
     // Set the pin states based on the tuned RGB values
-    analogWrite(led[segment].red, tunedRGB[0]);
-    analogWrite(led[segment].green, tunedRGB[1]);
-    analogWrite(led[segment].blue, tunedRGB[2]);
+    for (int brightness = 0; brightness < 100; brightness++) {
+        digitalWrite(led[segment].red, brightness < tunedRGB[0] ?      LOW : HIGH);
+        digitalWrite(led[segment].green, brightness < tunedRGB[1] ?    LOW : HIGH);
+        digitalWrite(led[segment].blue, brightness < tunedRGB[2] ?     LOW : HIGH);
+    }
 
     // Check buttons once per frame
     checkButtons();
+
+    // Slow down to prevent excessive CPU usage
+    delay(1);
 }

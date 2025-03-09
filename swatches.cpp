@@ -1,11 +1,17 @@
 #include "swatches.h"
-#include <Arduino.h> 
+#include <Arduino.h>
 
 // Define macro to convert rgb(r, g, b) to {r, g, b}
 #define rgb(r, g, b) {r, g, b}
 
 uint8_t swatchIndex = 0;
 
+/*
+    highlight
+    primary
+    accent
+    background
+*/
 // Master array of swatches
 swatch swatchArray[numSwatches] = {
     {
@@ -31,7 +37,12 @@ swatch swatchArray[numSwatches] = {
         rgb(255, 72, 0),
         rgb(255, 0, 0),
         rgb(95, 0, 0)
-    }
+    },
+    {
+        rgb(50, 0, 255),
+        rgb(0, 0, 255),
+        rgb(0, 0, 255),
+        rgb(255, 0, 255)
 };
 
 // Colors used for the bootup animation
