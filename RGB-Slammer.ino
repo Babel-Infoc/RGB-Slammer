@@ -12,9 +12,6 @@ https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token
 #include "types.h"
 #include "swatches.h"
 
-// Define macro to convert rgb(r, g, b) to {r, g, b}
-#define rgb(r, g, b) {r, g, b}
-
 // Define numLEDs here instead of in types.h to avoid multiple definitions
 const uint8_t numLEDs = 2;
 
@@ -31,7 +28,11 @@ const uint8_t animBtn = PC0;
 
 // Maximum brightness modifier, 0-100
 const float maxBrightness = 0.5;
+
 // ToDo: Add an ambient brightness modifier
+
+// Slow down all animations by this amount (in milliseconds)
+const uint8_t slowDown = 0;
 
 // Luminosity modifiers
 // Define the light intensity of each LED color at the specified mA value
@@ -39,9 +40,6 @@ const float maxBrightness = 0.5;
 const luminance red       = {8, 52};
 const luminance green     = {5, 163};
 const luminance blue      = {3, 18};
-
-// How many animations in the loop
-extern const uint8_t numAnimations = 4;
 
 // MARK: ------------------------------ Startup operations ------------------------------
 void setup() {
@@ -63,20 +61,25 @@ void setup() {
     float randSeed2(analogRead(1));
 
     // Show the bootup animation
-    startup();
+    bounceBoot(50);
 }
 
 /*=======================================================================================
 // MARK:                                Main loop                                      //
 =======================================================================================*/
 
+// How many animations in the loop
+extern const uint8_t numAnimations = 4;
+
 void loop() {
     switch (animIndex) {
-        case 0: pulseColor(200); break;
-        case 1: neonFlicker(10, 50, 20); break;
-        case 2: progressiveFade(5000); break;
-        case 3: randomFade(20, 1000); break;
-        default: pulseColor(200); break;
+        case 0: progressiveFade(15000); break;
+        case 1: randomFade(20, 2000); break;
+        case 2: pulseColor(700); break;
+        case 3: neonFlicker(10, 80, 30); break;
+        case 4: bounceBoot(50); break;
+        case 5: holdYourColorPrimary(); break;
+        case 6: holdYourColorAccent(); break;
     }
 }
 
@@ -90,6 +93,10 @@ void pulseColor(const uint8_t duration){
     int speed = duration/swatchSize;
     fadeToColor(swatchArray[swatchIndex].highlight,  swatchArray[swatchIndex].highlight,   (speed/3));
     fadeToColor(swatchArray[swatchIndex].primary,    swatchArray[swatchIndex].primary,     (speed));
+    fadeToColor(swatchArray[swatchIndex].ambient,    swatchArray[swatchIndex].ambient,     (speed));
+    fadeToColor(swatchArray[swatchIndex].highlight,  swatchArray[swatchIndex].highlight,   (speed/3));
+    fadeToColor(swatchArray[swatchIndex].primary,    swatchArray[swatchIndex].primary,     (speed));
+    fadeToColor(swatchArray[swatchIndex].ambient,    swatchArray[swatchIndex].ambient,     (speed));
     fadeToColor(swatchArray[swatchIndex].accent,     swatchArray[swatchIndex].accent,      (speed));
     fadeToColor(swatchArray[swatchIndex].background, swatchArray[swatchIndex].background,  (speed*6));
 }
@@ -99,6 +106,7 @@ void pulseColor(const uint8_t duration){
 void progressiveFade(const unsigned int duration) {
     fadeToColor(swatchArray[swatchIndex].highlight,  swatchArray[swatchIndex].highlight,   (duration/swatchSize));
     fadeToColor(swatchArray[swatchIndex].primary,    swatchArray[swatchIndex].primary,     (duration/swatchSize));
+    fadeToColor(swatchArray[swatchIndex].ambient,    swatchArray[swatchIndex].ambient,     (duration/swatchSize));
     fadeToColor(swatchArray[swatchIndex].accent,     swatchArray[swatchIndex].accent,      (duration/swatchSize));
     fadeToColor(swatchArray[swatchIndex].background, swatchArray[swatchIndex].background,  (duration/swatchSize));
 }
@@ -107,8 +115,8 @@ void progressiveFade(const unsigned int duration) {
 // Fades between random colors in the active swatch, each fade for a random speed defined by <min> and <max>
 void randomFade(const uint8_t min, const uint8_t max) {
     // Get random color indices (0-3) for each LED channel
-    uint8_t color1 = random(0, 4);
-    uint8_t color2 = random(0, 4);
+    uint8_t color1 = random(0, swatchSize);
+    uint8_t color2 = random(0, swatchSize);
 
     // Arrays to hold the selected colors for each LED
     uint8_t* firstColor;
@@ -118,16 +126,18 @@ void randomFade(const uint8_t min, const uint8_t max) {
     switch (color1) {
         case 0: firstColor = swatchArray[swatchIndex].highlight; break;
         case 1: firstColor = swatchArray[swatchIndex].primary; break;
-        case 2: firstColor = swatchArray[swatchIndex].accent; break;
-        case 3: firstColor = swatchArray[swatchIndex].background; break;
+        case 2: firstColor = swatchArray[swatchIndex].ambient; break;
+        case 3: firstColor = swatchArray[swatchIndex].accent; break;
+        case 4: firstColor = swatchArray[swatchIndex].background; break;
     }
 
     // Select the second color based on the random index
     switch (color2) {
         case 0: secondColor = swatchArray[swatchIndex].highlight; break;
         case 1: secondColor = swatchArray[swatchIndex].primary; break;
-        case 2: secondColor = swatchArray[swatchIndex].accent; break;
-        case 3: secondColor = swatchArray[swatchIndex].background; break;
+        case 2: secondColor = swatchArray[swatchIndex].ambient; break;
+        case 3: secondColor = swatchArray[swatchIndex].accent; break;
+        case 4: secondColor = swatchArray[swatchIndex].background; break;
     }
 
     // Fade between the two random colors with a random duration
@@ -159,19 +169,32 @@ void neonFlicker(const uint8_t chance, const uint8_t intensity, const uint8_t sp
 }
 
 
-// MARK: startup ----------------------------------------------------------------------------------------------------
-void startup(){
-    uint8_t speed = 50;
+// MARK: bounceBoot ----------------------------------------------------------------------------------------------------
+void bounceBoot(uint8_t speed){
     for (uint8_t reps = 0; reps < 3; reps++) {
         if (reps == 2) speed = 300;
         for (uint8_t segment = 0; segment < numLEDs; segment++) {
-            fadeToColor(bootswatch[0], bootswatch[1], speed);
-            fadeToColor(bootswatch[1], bootswatch[2], speed);
-            fadeToColor(bootswatch[2], bootswatch[3], speed);
-            fadeToColor(bootswatch[3], bootswatch[4], speed);
-            fadeToColor(bootswatch[4], bootswatch[4], speed);
+            fadeToColor(swatchArray[swatchIndex].highlight,  swatchArray[swatchIndex].background,   (speed));
+            fadeToColor(swatchArray[swatchIndex].primary,    swatchArray[swatchIndex].highlight,    (speed));
+            fadeToColor(swatchArray[swatchIndex].ambient,    swatchArray[swatchIndex].primary,      (speed));
+            fadeToColor(swatchArray[swatchIndex].accent,     swatchArray[swatchIndex].ambient,      (speed));
+            fadeToColor(swatchArray[swatchIndex].background, swatchArray[swatchIndex].accent,       (speed));
+            fadeToColor(swatchArray[swatchIndex].background, swatchArray[swatchIndex].background,   (speed));
         }
     }
+}
+
+// MARK: holdYourColor ------------------------------------------------------------------------------------------------
+// Shows the primary color only
+void holdYourColorPrimary(){
+    sendToRGB(0, swatchArray[swatchIndex].primary);
+    sendToRGB(1, swatchArray[swatchIndex].primary);
+}
+
+// Shows the primary and accent colors
+void holdYourColorAccent(){
+    sendToRGB(0, swatchArray[swatchIndex].primary);
+    sendToRGB(1, swatchArray[swatchIndex].accent);
 }
 
 // MARK: --- Animation processor

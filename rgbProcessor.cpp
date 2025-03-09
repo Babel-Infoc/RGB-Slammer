@@ -100,5 +100,5 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     checkButtons();
 
     // Slow down to prevent excessive CPU usage
-    delay(1);
+    delay(slowDown);
 }

@@ -1,6 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
-#include <Arduino.h> 
+#include <Arduino.h>
 
 // MARK: ------------------------------ Hardware structure definitions ------------------------------
 // Struct for LED segment definition
@@ -33,6 +33,9 @@ extern const luminance blue;
 // MARK: ------------------------------ Global variables ------------------------------
 // Handover color
 extern uint8_t handoverColor[2][3];
+
+// CPU slowdown
+extern const uint8_t slowDown;
 
 // MARK: ------------------------------ Button handling ------------------------------
 // Current color swatch
