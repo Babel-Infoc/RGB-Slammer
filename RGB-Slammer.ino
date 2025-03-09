@@ -160,12 +160,15 @@ void neonFlicker(const uint8_t chance, const uint8_t intensity, const uint8_t sp
                 // Mix primary color and background color with flickerInt
                 flickerOutput[segment][pin] = swatchArray[swatchIndex].primary[pin] + (swatchArray[swatchIndex].background[pin] - swatchArray[swatchIndex].primary[pin]) * flickerInt;
             }
-            sendToRGB(segment, flickerOutput[segment]);
+            while (millis() - startTime < speed) {
+                sendToRGB(segment, flickerOutput[segment]);
+            }
         } else {
-            sendToRGB(segment, swatchArray[swatchIndex].primary);
+            while (millis() - startTime < speed) {
+                sendToRGB(segment, swatchArray[swatchIndex].primary);
+            }
         }
     }
-    delay(flickerTime);
 }
 
 
