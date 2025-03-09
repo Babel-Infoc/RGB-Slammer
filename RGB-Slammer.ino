@@ -69,7 +69,7 @@ void setup() {
 =======================================================================================*/
 
 // How many animations in the loop
-extern const uint8_t numAnimations = 4;
+extern const uint8_t numAnimations = 6;
 
 void loop() {
     switch (animIndex) {
