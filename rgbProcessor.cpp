@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <algorithm>
+#include <array>
 #include "swatches.h"
 #include "types.h"
 
@@ -8,27 +9,13 @@ int colorButtonLastState = HIGH;
 int animButtonLastState = HIGH;
 
 // Initialize the tuned RGB array and tune ratio array
-float tuneRatio[3] = {1.0, 1.0, 1.0};  // Initialize with default values
+std::array<float, 3> tuneRatio = {1.0, 1.0, 1.0};  // Initialize with default values
 
 // Initialize the handover color array
-int handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}}; // Definition for extern variable from types.h
+std::array<std::array<int, 3>, 2> handoverColor = {{{0, 0, 0}, {0, 0, 0}}}; // Definition for extern variable from types.h
 
-// MARK: ------------------------------ luminance Calculations ------------------------------
-// Attenuate RGB values by the LEDs documented luminous intensity at the specified mA value
-void calculateLuminance() {
-    // Attenuate RGB values by the LEDs documented luminous intensity at the specified mA value
-    float highestLuminance = max(max(red.luminance, green.luminance), blue.luminance);
-    tuneRatio[0] = 1.0f - ((red.luminance / highestLuminance) / red.mA);
-    tuneRatio[1] = 1.0f - ((green.luminance / highestLuminance) / green.mA);
-    tuneRatio[2] = 1.0f - ((blue.luminance / highestLuminance) / blue.mA);
-
-    // Get the highest Ratio value, adjust it up to 1, and adjust the other two ratios up at the same rate
-    float maxRatio = max(max(tuneRatio[0], tuneRatio[1]), tuneRatio[2]);
-    float tuneratio = 1.0f / maxRatio;
-    for (int i = 0; i < 3; i++) {
-        tuneRatio[i] *= tuneratio;
-    }
-}
+// Reference to the leds array defined in the main sketch
+extern ledSegment leds[];
 
 // MARK: ------------------------------ Gamma Correction ------------------------------
 // Define gamma8 array in the implementation section
@@ -91,31 +78,46 @@ void checkAnimButton() {
 
 // MARK: ------------------------------ RGB Processing ------------------------------
 // Convert the rgb or rgba string to an RGB Array
-void rgbStringToArray(const char* rgbString, int rgbArray[3]) {
+void rgbStringToArray(const char* rgbString, std::array<int, 3>& rgbArray) {
     if (sscanf(rgbString, "rgb(%d,%d,%d)", &rgbArray[0], &rgbArray[1], &rgbArray[2]) != 3) {
         // If the provided rgb string includes an alpha value, fuck that shit off
         sscanf(rgbString, "rgba(%d,%d,%d,%*f)", &rgbArray[0], &rgbArray[1], &rgbArray[2]);
     }
 }
 
-void sendToRGB(const int segment, const int rgbValue[3]) {
-    int tunedRGB[3];
+// MARK: ------------------------------ RGB Processing ------------------------------
+// Function to process the raw RGB values to accurate and consistent luminosity and hue
+void sendToRGB(const int segment, const std::array<int, 3>& inRgbValue) {
+    float rRatio, gRatio, bRatio;
+    std::array<int, 3> tunedRGB;
 
-    // Write the end color to the handover color matching the led segment
+    // Assign the input RGB values to the handover color array
+    handoverColor[segment] = inRgbValue;
+
+    // Attenuate RGB values by the LEDs documented luminous intensity at the specified mA value
+    float maxLum = max(max(red.luminance, green.luminance), blue.luminance);
+    rRatio    = 1.0f - ((red.luminance / maxLum) / red.mA);
+    gRatio    = 1.0f - ((green.luminance / maxLum) / green.mA);
+    bRatio    = 1.0f - ((blue.luminance / maxLum) / blue.mA);
+    tuneRatio = {rRatio, gRatio, bRatio};
+
+    // Get the highest Ratio value, adjust it up to 1, and adjust the other two ratios up at the same rate
+    float maxRatio = max(max(rRatio, gRatio), bRatio);
+    float tuneratio = 1.0f / maxRatio;
     for (int pin = 0; pin < 3; pin++) {
-        handoverColor[segment][pin] = rgbValue[pin];
+        tuneRatio[pin] *= tuneratio;
     }
 
     // Adjust the RGB values by the luminosity ratios, the brightness modifier, and apply gamma correction
     for (int pin = 0; pin < 3; pin++) {
-        tunedRGB[pin] = gamma8[(int)(((rgbValue[pin] * tuneRatio[pin]) * maxBrightness) / 100)];
+        tunedRGB[pin] = gamma8[(int)((inRgbValue[pin] * tuneRatio[pin]) * maxBrightness / 100)]; // Divide by 100 to scale properly
     }
 
     // Output the final values to the LED array
-    for (int pin = 0; pin < 3; pin++) {
-        for (int brightness = 0; brightness < 100; brightness++) {
-            digitalWrite(ledSegment[segment][pin], brightness < tunedRGB[pin] ? LOW : HIGH);
-        }
+    for (int brightness = 0; brightness < 100; brightness++) {
+        digitalWrite(leds[segment].red,     brightness < tunedRGB[0] ? LOW : HIGH);
+        digitalWrite(leds[segment].green,   brightness < tunedRGB[1] ? LOW : HIGH);
+        digitalWrite(leds[segment].blue,    brightness < tunedRGB[2] ? LOW : HIGH);
     }
 
     // Check buttons for updates

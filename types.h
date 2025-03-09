@@ -1,17 +1,26 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <array>
+
 // MARK: ------------------------------ Hardware Definitions ------------------------------
-// Array for LED segment definition
-extern int ledSegment[2][3];
+// Struct for LED segment definition
+typedef struct {
+    int red;             // Red pin
+    int green;           // Green pin
+    int blue;            // Blue pin
+} ledSegment;
+
+// Array of LED segments
+extern ledSegment leds[];  // Changed from led[] to leds[] to match the definition in RGB-Slammer.ino
 
 // Pin definitions
 extern const int colorBtn;
 extern const int animBtn;
 
 // MARK: ------------------------------ External Variables ------------------------------
-// Number of LED segments
-extern const int numLEDs;
+// Number of LED segments - changed from definition to declaration
+extern const int numLEDs;  // Removed initialization here to avoid multiple definitions
 
 // LED luminance information
 struct luminance {
@@ -20,13 +29,21 @@ struct luminance {
 };
 
 // Brightness and luminance globals
-extern const int maxBrightness;
+extern const float maxBrightness;
 extern const luminance red;
 extern const luminance green;
 extern const luminance blue;
 
 // Handover color
-extern int handoverColor[2][3];
+extern std::array<std::array<int, 3>, 2> handoverColor;
+
+// MARK: ------------------------------ Button Handling ------------------------------
+// Current color swatch
+extern int colorIndex;
+
+// Current animation index
+extern const int numAnimations;
+extern int animIndex;
 
 // MARK: ------------------------------ Swatch Handling ------------------------------
 // Swatch struct
@@ -51,26 +68,10 @@ extern int swatchArraySize;
 // Store the current swatch in a global variable
 extern swatch currentSwatch;
 
-// MARK: ------------------------------ Button Handling ------------------------------
-// Current animation index
-extern const int numAnimations;
-extern int animIndex;
-
-// Function to check button states and update indexes
+// MARK: ------------------------------ Functions ------------------------------
+void calculateLuminance();
+void rgbStringToArray(const char* rgbString, std::array<int, 3>& rgbArray);
+void sendToRGB(const int segment, const std::array<int, 3>& rgbValue);
 void checkColorButton();
 void checkAnimButton();
-
-// MARK: ------------------------------ Gamma Correction ------------------------------
-// Declare gamma8 array (definition is in the .cpp file)
-extern const uint8_t gamma8[];
-
-// MARK: ------------------------------ RGB Processing Functions ------------------------------
-void calculateLuminance();
-
-// Convert the rgb or rgba string to an RGB Array
-void rgbStringToArray(const char* rgbString, int rgbArray[3]);
-
-// Process the raw RGB values to accurate and consistent luminosity and hue
-void sendToRGB(const int segment, const int rgbValue[3]);
-
 #endif // TYPES_H

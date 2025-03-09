@@ -1,3 +1,4 @@
+#include <array>
 #include "types.h"
 #include "swatches.h"
 
@@ -12,8 +13,12 @@
 
 // MARK: ------------------------------ Variables and config ------------------------------
 
-// Define your LED segment pins, in the order {Red, Green, Blue}
-int ledSegment[2][3] = {
+// Define numLEDs here instead of in types.h to avoid multiple definitions
+const int numLEDs = 2;
+
+// The `leds` array contains the pin configurations for different LEDs.
+// Each element in the array represents a different LED with its associated pins.
+ledSegment leds[2] = {
     {PD5, PD3, PD4},
     {PC5, PC6, PC4}
 };
@@ -23,7 +28,7 @@ const int colorBtn = PC3;
 const int animBtn = PC0;
 
 // Maximum brightness modifier, 0-100
-const int maxBrightness = 50;
+const float maxBrightness = 50;
 // ToDo: Add an ambient brightness modifier
 
 // Current color swatch
@@ -60,9 +65,9 @@ void setup() {
 
     // Set up all LED segments
     for (int segment = 0; segment < 2; segment++) {
-        for (int pin = 0; pin < 3; pin++) {
-            pinMode(ledSegment[segment][pin], OUTPUT);
-        }
+        pinMode(leds[segment].red, OUTPUT);
+        pinMode(leds[segment].green, OUTPUT);
+        pinMode(leds[segment].blue, OUTPUT);
     }
     // Set up the color and animation buttons
     pinMode(colorBtn, INPUT_PULLUP);
@@ -153,9 +158,8 @@ void randomFade(const int min, const int max) {
 
 // MARK: neonFlicker
 void neonFlicker(const int chance) {
-    int primary[3];
-    int background[3];
-    int flickerOutput[3];
+    std::array<int, 3> primary;
+    std::array<int, 3> background;
 
     rgbStringToArray(currentSwatch.primary, primary);
     rgbStringToArray(currentSwatch.background, background);
@@ -198,8 +202,8 @@ void startup(){
 // MARK: showColor
 // Displays the color for the specified hangTime
 void showColor(const char* color1, const char* color2, const int hangTime) {
-    int rgbColor1[3];
-    int rgbColor2[3];
+    std::array<int, 3> rgbColor1;
+    std::array<int, 3> rgbColor2;
     rgbStringToArray(color1, rgbColor1);
     rgbStringToArray(color2, rgbColor2);
 
@@ -212,19 +216,15 @@ void showColor(const char* color1, const char* color2, const int hangTime) {
 
 // MARK: fadeToColor
 void fadeToColor(const char* color1, const char* color2, const int fadeTime) {
-    int startColor[2][3];
-    int endColor[2][3];
-    int output[2][3];
+    std::array<std::array<int, 3>, 2> startColor;
+    std::array<std::array<int, 3>, 2> endColor;
+    std::array<std::array<int, 3>, 2> output;
 
     rgbStringToArray(color1, endColor[0]);
     rgbStringToArray(color2, endColor[1]);
 
     // Copy handoverColor to startColor
-    for (int segment = 0; segment < 2; segment++) {
-        for (int pin = 0; pin < 3; pin++) {
-            startColor[segment][pin] = handoverColor[segment][pin];
-        }
-    }
+    startColor = handoverColor;
 
     unsigned long startTime = millis();
     while (millis() - startTime < fadeTime) {
