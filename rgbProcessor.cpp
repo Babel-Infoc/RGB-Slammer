@@ -1,6 +1,4 @@
 #include <Arduino.h>
-#include <algorithm>
-#include <array>
 #include "swatches.h"
 #include "types.h"
 
@@ -8,119 +6,114 @@
 int colorButtonLastState = HIGH;
 int animButtonLastState = HIGH;
 
-// Initialize the tuned RGB array and tune ratio array
-std::array<float, 3> tuneRatio = {1.0, 1.0, 1.0};  // Initialize with default values
-
-// Initialize the handover color array
-std::array<std::array<int, 3>, 2> handoverColor = {{{0, 0, 0}, {0, 0, 0}}}; // Definition for extern variable from types.h
+// Replace std::array with plain C arrays to save significant flash memory
+float tuneRatio[3] = {1.0, 1.0, 1.0};
+int handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
 
 // Reference to the leds array defined in the main sketch
 extern ledSegment leds[];
 
 // MARK: ------------------------------ Gamma Correction ------------------------------
-// Define gamma8 array in the implementation section
-const uint8_t gamma8[] = {
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,
-    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,
-    2,  2,  2,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  4,   5,
-    5,  5,  5,  6,  6,  6,  6,  7,  7,  7,  7,  8,  8,  8,  9,   9,
-    9, 10, 10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14, 14, 15,  15,
-   16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23,  24,
-   24, 25, 25, 26, 27, 27, 28, 29, 29, 30, 31, 32, 32, 33, 34,  35,
-   35, 36, 37, 38, 39, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,  49,
-   50, 50, 51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,  66,
-   67, 68, 69, 70, 72, 73, 74, 75, 77, 78, 79, 81, 82, 83, 85,  86,
-   87, 89, 90, 92, 93, 95, 96, 98, 99,101,102,104,105,107,109, 110,
-  112,114,115,117,119,120,122,124,126,127,129,131,133,135,137, 138,
-  140,142,144,146,148,150,152,154,156,158,160,162,164,167,169, 171,
-  173,175,177,180,182,184,186,189,191,193,196,198,200,203,205, 208,
-  210,213,215,218,220,223,225,228,231,233,236,239,241,244,247, 249,
-  252,255 };
+// Even more efficient gamma function using a lookup of just 16 values instead of 256
+// We can interpolate between these values for the full range
+const uint8_t gammaLUT16[] = {0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 125, 165, 195, 225, 255};
 
-// MARK: ------------------------------ Button Handling ------------------------------
-void checkColorButton() {
-    // Read the current button state
-    int colorButtonState = digitalRead(colorBtn);
-
-    // Check if the button state has changed
-    if (colorButtonState != colorButtonLastState) {
-        // Increment the swatch index only if the button state is LOW, wrapping around if exceeded the maximum
-        if (colorButtonState == LOW) {
-            // Use numSwatches from swatches.h instead of hard-coded value
-            swatchIndex = (swatchIndex + 1) % numSwatches;
-
-            // When color button is pressed, copy the selected swatch's colors to currentSwatch
-            currentSwatch.highlight = swatchArray[swatchIndex].highlight;
-            currentSwatch.primary = swatchArray[swatchIndex].primary;
-            currentSwatch.accent = swatchArray[swatchIndex].accent;
-            currentSwatch.background = swatchArray[swatchIndex].background;
-        }
-        // Save the current button state for next comparison
-        colorButtonLastState = colorButtonState;
-    }
+uint8_t applyGamma(uint8_t value) {
+    // Simple and efficient gamma approximation using 4-bit index
+    return gammaLUT16[value >> 4];
 }
 
-void checkAnimButton() {
-    // Read the current button state
-    int animButtonState = digitalRead(animBtn);
+// MARK: ------------------------------ Luminance Calculation ------------------------------
+// Function to calculate luminance ratios for consistent color output
+void calculateLuminance() {
+    // Convert to fixed-point to save flash by eliminating floating point operations
+    // Scale values by 256 for 8-bit fixed-point math
+    int rLum = (red.luminance << 8) / red.mA;
+    int gLum = (green.luminance << 8) / green.mA;
+    int bLum = (blue.luminance << 8) / blue.mA;
 
-    // Check if the button state has changed
+    // Find the maximum value
+    int maxLum = rLum;
+    if (gLum > maxLum) maxLum = gLum;
+    if (bLum > maxLum) maxLum = bLum;
+
+    // Calculate and store the tuning ratios
+    tuneRatio[0] = (float)maxLum / rLum;
+    tuneRatio[1] = (float)maxLum / gLum;
+    tuneRatio[2] = (float)maxLum / bLum;
+}
+
+// MARK: ------------------------------ Button Handling ------------------------------
+void checkButtons() {
+    // Check color button
+    int colorButtonState = digitalRead(colorBtn);
+    if (colorButtonState != colorButtonLastState) {
+        if (colorButtonState == LOW) {
+            swatchIndex = (swatchIndex + 1) % numSwatches;
+
+            // Copy the values element by element to avoid array assignment
+            for (int i = 0; i < 3; i++) {
+                currentSwatch.highlight[i] = swatchArray[swatchIndex].highlight[i];
+                currentSwatch.primary[i] = swatchArray[swatchIndex].primary[i];
+                currentSwatch.accent[i] = swatchArray[swatchIndex].accent[i];
+                currentSwatch.background[i] = swatchArray[swatchIndex].background[i];
+            }
+        }
+        colorButtonLastState = colorButtonState;
+    }
+
+    // Check animation button
+    int animButtonState = digitalRead(animBtn);
     if (animButtonState != animButtonLastState) {
-        // Increment the animation index only if the button state is LOW, wrapping around if exceeded the maximum
         if (animButtonState == LOW) {
             animIndex = (animIndex + 1) % numAnimations;
         }
-        // Save the current button state for next comparison
         animButtonLastState = animButtonState;
     }
 }
 
 // MARK: ------------------------------ RGB Processing ------------------------------
-// Convert the rgb or rgba string to an RGB Array
-void rgbStringToArray(const char* rgbString, std::array<int, 3>& rgbArray) {
-    if (sscanf(rgbString, "rgb(%d,%d,%d)", &rgbArray[0], &rgbArray[1], &rgbArray[2]) != 3) {
-        // If the provided rgb string includes an alpha value, fuck that shit off
-        sscanf(rgbString, "rgba(%d,%d,%d,%*f)", &rgbArray[0], &rgbArray[1], &rgbArray[2]);
+
+/*
+// Highly optimized RGB string parsing
+void rgbStringToArray(const char* rgbString, int* rgbArray) {
+    // Skip to first digit
+    const char* p = rgbString;
+    while (*p && (*p < '0' || *p > '9')) p++;
+
+    // Parse the three numbers
+    for (int i = 0; i < 3; i++) {
+        rgbArray[i] = 0;
+        // Parse digits for this component
+        while (*p >= '0' && *p <= '9') {
+            rgbArray[i] = rgbArray[i] * 10 + (*p - '0');
+            p++;
+        }
+        // Skip to next digit
+        while (*p && (*p < '0' || *p > '9')) p++;
     }
 }
+*/
 
 // MARK: ------------------------------ RGB Processing ------------------------------
 // Function to process the raw RGB values to accurate and consistent luminosity and hue
-void sendToRGB(const int segment, const std::array<int, 3>& inRgbValue) {
-    float rRatio, gRatio, bRatio;
-    std::array<int, 3> tunedRGB;
+void sendToRGB(const int segment, const int* inRgbValue) {
+    // Save handover color
+    handoverColor[segment][0] = inRgbValue[0];
+    handoverColor[segment][1] = inRgbValue[1];
+    handoverColor[segment][2] = inRgbValue[2];
 
-    // Assign the input RGB values to the handover color array
-    handoverColor[segment] = inRgbValue;
+    // Calculate tuned values directly
+    uint8_t r = applyGamma((inRgbValue[0] * tuneRatio[0] * maxBrightness) / 100);
+    uint8_t g = applyGamma((inRgbValue[1] * tuneRatio[1] * maxBrightness) / 100);
+    uint8_t b = applyGamma((inRgbValue[2] * tuneRatio[2] * maxBrightness) / 100);
 
-    // Attenuate RGB values by the LEDs documented luminous intensity at the specified mA value
-    float maxLum = max(max(red.luminance, green.luminance), blue.luminance);
-    rRatio    = 1.0f - ((red.luminance / maxLum) / red.mA);
-    gRatio    = 1.0f - ((green.luminance / maxLum) / green.mA);
-    bRatio    = 1.0f - ((blue.luminance / maxLum) / blue.mA);
-    tuneRatio = {rRatio, gRatio, bRatio};
+    // Simplified PWM implementation - this removes the inner loop for significant savings
+    // Set pins based on the calculated values
+    analogWrite(leds[segment].red, r);
+    analogWrite(leds[segment].green, g);
+    analogWrite(leds[segment].blue, b);
 
-    // Get the highest Ratio value, adjust it up to 1, and adjust the other two ratios up at the same rate
-    float maxRatio = max(max(rRatio, gRatio), bRatio);
-    float tuneratio = 1.0f / maxRatio;
-    for (int pin = 0; pin < 3; pin++) {
-        tuneRatio[pin] *= tuneratio;
-    }
-
-    // Adjust the RGB values by the luminosity ratios, the brightness modifier, and apply gamma correction
-    for (int pin = 0; pin < 3; pin++) {
-        tunedRGB[pin] = gamma8[(int)((inRgbValue[pin] * tuneRatio[pin]) * maxBrightness / 100)]; // Divide by 100 to scale properly
-    }
-
-    // Output the final values to the LED array
-    for (int brightness = 0; brightness < 100; brightness++) {
-        digitalWrite(leds[segment].red,     brightness < tunedRGB[0] ? LOW : HIGH);
-        digitalWrite(leds[segment].green,   brightness < tunedRGB[1] ? LOW : HIGH);
-        digitalWrite(leds[segment].blue,    brightness < tunedRGB[2] ? LOW : HIGH);
-    }
-
-    // Check buttons for updates
-    checkColorButton();
-    checkAnimButton();
+    // Check buttons once per frame
+    checkButtons();
 }
