@@ -12,14 +12,16 @@ typedef struct {
 } ledSegment;
 
 // Array of LED segments
-extern ledSegment leds[];  // Changed from led[] to leds[] to match the definition in RGB-Slammer.ino
+extern ledSegment leds[];
 
 // Pin definitions
 extern const int colorBtn;
 extern const int animBtn;
 
 // MARK: ------------------------------ External Variables ------------------------------
-// Number of LED segments - changed from definition to declaration
+// Define macro to convert rgb(r, g, b) to {r, g, b}
+#define rgb(r, g, b) {r, g, b}
+
 extern const int numLEDs;  // Removed initialization here to avoid multiple definitions
 
 // LED luminance information
@@ -35,7 +37,7 @@ extern const luminance green;
 extern const luminance blue;
 
 // Handover color
-extern std::array<std::array<int, 3>, 2> handoverColor;
+extern int handoverColor[2][3];
 
 // MARK: ------------------------------ Button Handling ------------------------------
 // Current color swatch
@@ -48,17 +50,23 @@ extern int animIndex;
 // MARK: ------------------------------ Swatch Handling ------------------------------
 // Swatch struct
 struct swatch {
-    const char* highlight;
-    const char* primary;
-    const char* accent;
-    const char* background;
+    int highlight[3];
+    int primary[3];
+    int accent[3];
+    int background[3];
 
     // Default constructor
-    swatch() : highlight(nullptr), primary(nullptr), accent(nullptr), background(nullptr) {}
+    swatch() : highlight{0, 0, 0}, primary{0, 0, 0}, accent{0, 0, 0}, background{0, 0, 0} {}
 
     // Constructor with parameters
-    swatch(const char* h, const char* p, const char* a, const char* b)
-        : highlight(h), primary(p), accent(a), background(b) {}
+    swatch(int h[3], int p[3], int a[3], int b[3]) {
+        for (int i = 0; i < 3; i++) {
+            highlight[i] = h[i];
+            primary[i] = p[i];
+            accent[i] = a[i];
+            background[i] = b[i];
+        }
+    }
 };
 
 // Current color swatch index
@@ -70,8 +78,7 @@ extern swatch currentSwatch;
 
 // MARK: ------------------------------ Functions ------------------------------
 void calculateLuminance();
-void rgbStringToArray(const char* rgbString, std::array<int, 3>& rgbArray);
-void sendToRGB(const int segment, const std::array<int, 3>& rgbValue);
-void checkColorButton();
-void checkAnimButton();
+//void rgbStringToArray(const char* rgbString, int* rgbArray);
+void sendToRGB(const int segment, const int* rgbValue);
+void checkButtons();
 #endif // TYPES_H
