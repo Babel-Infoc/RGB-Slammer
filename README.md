@@ -11,31 +11,35 @@
 This is my solution to getting RGB animations on the CH32V003 with the Arduino IDE, but you can use this to run RGB LEDs on any chip that has 3 GPIO pins without dependancies or other libraries.
 
  ## Features <a name = "features"></a>
-- ### Colors stored as RGB Strings
-    Allows VSCode to display RGB values as colored squares, allowing for easy visual selection and adjustment
-- ### Multiple simultaneous LED segments
-    Can be configured for separate colors and animations, which will all run simultaneously, no `delay` pauses
+- ### VSCode Color Decorator compatibility
+    Allows VSCode to display RGB values as colored squares, allowing for easy visual selection and adjustment<br>
+    RGB Strings are automatically converted to RGB values by the `#define rgb(r, g, b) {r, g, b}` macro
+- ### Button selection for active Animation and Color swatch
+    Two buttons are configured to swap between animations and color swatches on the fly
+- ### Swatch arrays
+    Iterate or randomize animation colors through customisable and expandable swatches<br>Color swatches are configured with a standard structure:
+    ```cpp
+    swatchArray[0].highlight;
+    swatchArray[0].primary;
+    swatchArray[0].accent;
+    swatchArray[0].background;
+    ```
+    Use `[0]` or `[1]` to set the color for the first or second led segment<br>Create or modify swatches in `swatches.cpp`
 - ### Automatic color tuning
     All RGB LEDs's have slightly different percieved brightness and between the red green and blue elements when provided the same power, which can affect the white tone and colour accuracy. Automatic color tuning is achieved by entering the typical mA and Luminance value for `red`, `green`, and `blue` according to your LED's datasheet.
 - ### Gamma correction
     Fix the percieved LED brightness curve using <a href="https://learn.adafruit.com/led-tricks-gamma-correction/">Phillip Burgess' fix</a>
+- ### Dual simultaneous output
+    Both segments can be configured for separate colors and animations, which will all run simultaneously
 - ### Preconfigured animations
     Included is a number of preconfigured animation elements and longer animation cycles, which are easily configured using main loop arguments
-- ### Swatch arrays
-    Iterate or randomize animation colors through customisable swatches. Create or modify swatches in the swatches.h header file.
 - ### Max output brightness
     `maxBrightness` float that can be configured between 0 and 1
 - ### Ambient brightness
     (feature in progress)
     `ambientBrightness` float that can be modified by a light sensor if you have one
-- ### Button input color / animation
-    (feature in progress)
 - ### Handover color
     Some animation subroutines are designed to fade in or interact with the last color displayed by the previous subroutine, as such all subroutines store their last RGB color in segment specific variables called handoverColor
-
-## Useful tools (optional)
-Edit the script in VSCode, and install the <a href="https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token">json-color-token</a> plugin to display an interactive colored square next to each RGB color value, allowing for very easy color selection and adjustment with visual representation.
-Color strings are automatically converted to RGB values by the `rgbStringToArray` subroutine
 
 ## Reason for development
 I wanted to run LED animations off the CH32V03.
