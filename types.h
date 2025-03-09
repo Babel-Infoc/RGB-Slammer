@@ -1,6 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
-#include <stdint.h>
+#include <Arduino.h> 
 
 // MARK: ------------------------------ Hardware structure definitions ------------------------------
 // Struct for LED segment definition

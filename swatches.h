@@ -1,6 +1,6 @@
 #ifndef SWATCHES_H
 #define SWATCHES_H
-#include <stdint.h>
+#include <Arduino.h> 
 
 // MARK: ------------------------------ Swatch definitions ------------------------------
 // Swatch structure, 4 RGB arrays

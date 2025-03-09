@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include "swatches.h"
+#include <Arduino.h> 
 
 // Define macro to convert rgb(r, g, b) to {r, g, b}
 #define rgb(r, g, b) {r, g, b}

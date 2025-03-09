@@ -8,16 +8,19 @@ https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token
 */
 
 // MARK: ------------------------------ Variables and config ------------------------------
-#include <stdint.h>
+#include <Arduino.h>
 #include "types.h"
 #include "swatches.h"
+
+// Define macro to convert rgb(r, g, b) to {r, g, b}
+#define rgb(r, g, b) {r, g, b}
 
 // Define numLEDs here instead of in types.h to avoid multiple definitions
 const uint8_t numLEDs = 2;
 
-// The `leds` array contains the pin configurations for different LEDs.
+// The `led` array contains the pin configurations for different LEDs.
 // Each element in the array represents a different LED with its associated pins.
-ledSegment leds[2] = {
+ledSegment led[2] = {
     {PD5, PD3, PD4},
     {PC5, PC6, PC4}
 };
@@ -45,18 +48,18 @@ extern const uint8_t numAnimations = 4;
 
 // MARK: ------------------------------ Startup operations ------------------------------
 void setup() {
-    // Calculate the luminosity modifiers
-    calculateLuminance();
-
     // Set up all LED segments
     for (uint8_t segment = 0; segment < 2; segment++) {
-        pinMode(leds[segment].red, OUTPUT);
-        pinMode(leds[segment].green, OUTPUT);
-        pinMode(leds[segment].blue, OUTPUT);
+        pinMode(led[segment].red, OUTPUT);
+        pinMode(led[segment].green, OUTPUT);
+        pinMode(led[segment].blue, OUTPUT);
     }
     // Set up the color and animation buttons
     pinMode(colorBtn, INPUT_PULLUP);
     pinMode(animBtn, INPUT_PULLUP);
+
+    // Calculate the luminosity modifiers
+    calculateLuminance();
 
     // Show the bootup animation
     startup();
@@ -83,45 +86,27 @@ void loop() {
 //                                    End main loop                                    //
 =======================================================================================*/
 
-// MARK: --- Animation loops ---
-/*
-    pulseColor
-        Pulses from highlight through to background colors in the active swatch, over <speed> milliseconds
-
-    progressiveFade
-        Fades through all colors in the active swatch in order, over <speed> milliseconds
-
-    randomFade
-        Fades between random colors in the active swatch, each fade for a random speed defined by <min> and <max>
-        (<min>, <max>);
-
-    strobe
-        Rapidly flashes between the highlight and background colors in the active swatch, over <speed> milliseconds
-
-    neonFlicker
-        Simulates a failing neon/fluorescent light flicker
-        By default shows <standard>, flickers to <background>, with <chance> of flickering
-
-    startup
-        A predefined startup animation with no variables, modify this to your liking
-*/
-
 // MARK: pulseColor -------------------------------------------------------------------------------------------------
+// Pulses from highlight through to background colors in the active swatch, over <speed> milliseconds
 void pulseColor(const uint8_t speed){
 
 }
 
 // MARK: progressiveFade --------------------------------------------------------------------------------------------
+// Fades through all colors in the active swatch in order, over <speed> milliseconds
 void progressiveFade(const uint8_t speed) {
 
 }
 
 // MARK: randomFade -------------------------------------------------------------------------------------------------
+// Fades between random colors in the active swatch, each fade for a random speed defined by <min> and <max>
 void randomFade(const uint8_t min, const uint8_t max) {
 
 }
 
 // MARK: neonFlicker ------------------------------------------------------------------------------------------------
+// Simulates a failing neon/fluorescent light flicker
+// By default shows <standard>, flickers to <background>, with <chance> of flickering
 void neonFlicker(const uint8_t chance) {
 
 }
@@ -147,8 +132,6 @@ void startup(){
 void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const uint8_t fadeTime){
     uint8_t startColor[2][3];
     uint8_t output[2][3];
-
-    // Calculate the fade ratio
     unsigned long startTime = millis();
     while (millis() - startTime < fadeTime) {
         for (uint8_t pin = 0; pin < 3; pin++) {

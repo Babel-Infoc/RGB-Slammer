@@ -12,8 +12,8 @@ uint8_t colorIndex = 0;
 float tuneRatio[3] = {1.0, 1.0, 1.0};
 uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
 
-// Reference to the leds array defined in the main sketch
-ledSegment led[3];
+// Reference to the led array defined in the main sketch
+extern ledSegment led[2];
 
 // MARK: Gamma Correction ------------------------------
 const uint8_t gamma8[] = {
@@ -79,24 +79,22 @@ void checkButtons() {
 // MARK: RGB Processing ------------------------------
 // Function to process the raw RGB values to accurate and consistent luminosity and hue
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
-    uint8_t tunedRGB[3];
+    int tunedRGB[3];
 
-    // Write the end color to the handover color matching the led segment
+    // Save rgbValue to handoverColor
     for (uint8_t pin = 0; pin < 3; pin++) {
         handoverColor[segment][pin] = rgbValue[pin];
     }
 
-    // Adjust the RGB values by the luminosity ratios, the brightness modifier, and apply gamma correction
+    // Calculate the brightness-adjusted and gamma-corrected values using global tuneRatio
     for (uint8_t pin = 0; pin < 3; pin++) {
-        tunedRGB[pin] = gamma8[(uint8_t)(((rgbValue[pin] * tuneRatio[pin]) * maxBrightness) / 100)];
+        tunedRGB[pin] = gamma8[(int)((rgbValue[pin] * tuneRatio[pin]) * (maxBrightness / 100.0f))];
     }
 
-    // Output the final values to the LED array
-    for (uint8_t brightness = 0; brightness < 100; brightness++) {
-        digitalWrite(led[segment].red,     brightness < tunedRGB[0] ? LOW : HIGH);
-        digitalWrite(led[segment].green,   brightness < tunedRGB[1] ? LOW : HIGH);
-        digitalWrite(led[segment].blue,    brightness < tunedRGB[2] ? LOW : HIGH);
-    }
+    // Set the pin states based on the tuned RGB values
+    analogWrite(led[segment].red, tunedRGB[0]);
+    analogWrite(led[segment].green, tunedRGB[1]);
+    analogWrite(led[segment].blue, tunedRGB[2]);
 
     // Check buttons once per frame
     checkButtons();
