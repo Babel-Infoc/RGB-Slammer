@@ -1,35 +1,48 @@
 #ifndef TYPES_H
 #define TYPES_H
+#include <Arduino.h> 
 
+// MARK: ------------------------------ Hardware structure definitions ------------------------------
 // Struct for LED segment definition
-typedef struct {
-    int redPin;             // Red pin
-    int greenPin;           // Green pin
-    int bluePin;            // Blue pin
-    // Potential future fields:
-    // uint8_t brightness;  // Per-segment brightness
-    // bool enabled;        // Enable/disable state
-} led_t;
+struct ledSegment {
+    int red;
+    int green;
+    int blue;
+};
 
 // Array of LED segments
-extern led_t leds[];
+extern ledSegment led[];
+
+// Pin definitions
+extern const uint8_t colorBtn;
+extern const uint8_t animBtn;
+extern const uint8_t numLEDs;
 
 // LED luminance information
 struct luminance {
-    int mA;
-    int lum;
+    uint8_t mA;
+    uint8_t luminance;
 };
 
-// Number of LED segments
-extern const int numLEDs;
-
-// Forward declarations of globals
+// Brightness and luminance globals
 extern const float maxBrightness;
-extern const luminance redLum;
-extern const luminance greenLum;
-extern const luminance blueLum;
+extern const luminance red;
+extern const luminance green;
+extern const luminance blue;
 
+// MARK: ------------------------------ Global variables ------------------------------
 // Handover color
-extern int handoverColor[2][3];
+extern uint8_t handoverColor[2][3];
 
+// MARK: ------------------------------ Button handling ------------------------------
+// Current color swatch
+extern uint8_t colorIndex;
+
+// Current animation index
+extern const uint8_t numAnimations;
+extern uint8_t animIndex;
+
+// MARK: ------------------------------ Functions ------------------------------
+void calculateLuminance();
+void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);
 #endif // TYPES_H
