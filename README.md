@@ -12,7 +12,7 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
 
  ## Features <a name = "features"></a>
 - ### Colors stored as RGB Strings
-    Makes the script compatible with the <a href="https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token">json-color-token</a> plugin (see Useful tools below)
+    Allows VSCode to display RGB values as colored squares, allowing for easy visual selection and adjustment
 - ### Multiple simultaneous LED segments
     Can be configured for separate colors and animations, which will all run simultaneously, no `delay` pauses
 - ### Automatic color tuning
