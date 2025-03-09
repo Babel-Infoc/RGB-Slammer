@@ -144,12 +144,12 @@ void progressiveFade(const int speed) {
 
 // MARK: randomFade
 void randomFade(const int min, const int max) {
-    const char* randColorArray[4] = {
+    std::array<const char*, swatchSize> randColorArray = {{
         currentSwatch.highlight,
         currentSwatch.primary,
         currentSwatch.accent,
         currentSwatch.background
-    };
+    }};
     int rand1 = random(0, swatchSize);
     int rand2 = random(0, swatchSize);
     int randSpeed = random(min, max);
@@ -177,9 +177,9 @@ void startup(){
     // Count the number of colors in the swatch (until NULL)
     int speed = 50;
     for (int pin = 0; pin < 3; pin++) {
-        for (int k = 0; k < 5; k++) {
+        for (int k = 0; k < bootswatch.size(); k++) {
             int speedAdj = (pin == 2) ? speed*2 : speed;
-            fadeToColor(bootswatch[k], bootswatch[(k + 1) % 5], speedAdj);
+            fadeToColor(bootswatch[k], bootswatch[(k + 1) % bootswatch.size()], speedAdj);
         }
     }
     fadeToColor("rgb(0,0,0)", "rgb(0,0,0)", speed*6);

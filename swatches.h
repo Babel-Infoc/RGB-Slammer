@@ -1,10 +1,14 @@
 #ifndef SWATCHES_H
 #define SWATCHES_H
+#include <array>
 #include "types.h"
 
 // Array of swatches
-const int swatchSize = 4;
-const swatch swatchArray[6] = {
+constexpr int swatchSize = 4; // Number of colors in each swatch
+constexpr int numSwatches = 6; // Number of swatches in the collection
+
+// Using std::array for a fixed-size container with better type safety
+const std::array<swatch, numSwatches> swatchArray = {{
     {
         "rgb(255, 220, 106)",
         "rgb(209, 0, 52)",
@@ -41,17 +45,18 @@ const swatch swatchArray[6] = {
         "rgb(74, 69, 143)",
         "rgb(18, 31, 48)"
     }
-};
+}};
 
 // Initialize the currentSwatch
 extern swatch currentSwatch;
 
-const char* const bootswatch[5] = {
+// Using std::array for bootwatch colors as well
+const std::array<const char*, 5> bootswatch = {{
     "rgb(0,0,0)",
     "rgb(255, 220, 106)",
     "rgb(209, 0, 52)",
     "rgb(75,0,130)",
-    "rgb(0, 0, 97)",
-};
+    "rgb(0, 0, 97)"
+}};
 
 #endif // SWATCHES_H

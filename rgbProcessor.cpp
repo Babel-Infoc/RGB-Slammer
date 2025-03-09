@@ -47,8 +47,8 @@ void checkColorButton() {
     if (colorButtonState != colorButtonLastState) {
         // Increment the swatch index only if the button state is LOW, wrapping around if exceeded the maximum
         if (colorButtonState == LOW) {
-            // Use the number of available swatches (6) from swatchArray
-            swatchIndex = (swatchIndex + 1) % 6;
+            // Use numSwatches from swatches.h instead of hard-coded value
+            swatchIndex = (swatchIndex + 1) % numSwatches;
 
             // When color button is pressed, copy the selected swatch's colors to currentSwatch
             currentSwatch.highlight = swatchArray[swatchIndex].highlight;
