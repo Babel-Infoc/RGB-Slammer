@@ -15,8 +15,8 @@ struct swatch {
 // Index of the current swatch
 const uint8_t swatchSize = 5;   // Number of colors in each swatch
 extern uint8_t numSwatches;     // Number of swatches in the collection (calculated from array size)
-extern swatch swatchArray[];    // Remove size specification to allow auto-calculation
-extern uint8_t swatchIndex;
+extern swatch swArr[];    // Remove size specification to allow auto-calculation
+extern uint8_t swInx;
 
 // Bootswatch definition
 extern const uint8_t bootswatch[5][3];
