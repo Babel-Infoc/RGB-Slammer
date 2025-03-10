@@ -82,6 +82,8 @@ void checkButtons() {
     }
 }
 
+// MARK: Light sensor ------------------------------
+
 // MARK: RGB Processing ------------------------------
 // Function to process the raw RGB values to accurate and consistent luminosity and hue
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {

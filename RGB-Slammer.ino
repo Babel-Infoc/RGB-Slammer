@@ -27,7 +27,7 @@ const uint8_t colorBtn = PC3;
 const uint8_t animBtn = PC0;
 
 // Maximum brightness modifier, 0-100
-const float maxBrightness = 0.8;
+const float maxBrightness = 0.6;
 
 // ToDo: Add an ambient brightness modifier
 
@@ -73,7 +73,7 @@ extern const uint8_t numAnimations = 10;
 
 void loop() {
     switch (animIndex) {
-        case 0: glitchLoop(20, 10, 1000); break;
+        case 0: glitchLoop(70, 10, 1000); break;
         //case 0: glitch1(0); break;
         case 1: progressiveFade1(2000); break;
         case 2: progressiveFade1(600); break;
@@ -186,10 +186,10 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const u
                     glitch1(flickerSegment);
                     break;
                 case 1:
-                    glitch2(flickerSegment);
+                    glitch2(swatch[swNum].ambient ,swatch[swNum].accent, flickerSegment);
                     break;
                 case 2:
-                    glitch3(flickerSegment);
+                    glitch3(flickerSegment, swatch[swNum].highlight, 20, 3);
                     break;
             }
             currentTime = millis();
@@ -284,55 +284,15 @@ void glitch1(const uint8_t segment){
 }
 
 // MARK: glitch2 ------------------------------------------------------------------------------------------
-void glitch2(const uint8_t duration) {
-    // Strobe-like rapid glitch effect
-    unsigned long startTime = millis();
-    while (millis() - startTime < duration) {
-        // Create random glitch colors by mixing highlight and accent with random intensities
-        uint8_t glitchColor1[3], glitchColor2[3];
-
-        for (uint8_t i = 0; i < 3; i++) {
-            float randomFactor1 = random(0, 100) / 100.0;
-            float randomFactor2 = random(0, 100) / 100.0;
-
-            glitchColor1[i] = swatch[swNum].highlight[i] * randomFactor1 +
-                             swatch[swNum].accent[i] * (1 - randomFactor1);
-
-            glitchColor2[i] = swatch[swNum].primary[i] * randomFactor2 +
-                             swatch[swNum].background[i] * (1 - randomFactor2);
-        }
-
-        // Show the glitch colors for a very short time
-        showColor(glitchColor1, glitchColor2, random(5, 30));
-
-        // Brief blackout between flashes
-        if (random(0, 100) < 30) {
-            showColor(swatch[swNum].background, swatch[swNum].background, random(5, 20));
-        }
-    }
-}
-
-// MARK: glitch3 ------------------------------------------------------------------------------------------
-void glitch3(const uint8_t duration) {
-    // Define an array for black color (all zeros)
-    uint8_t black[3] = {0, 0, 0};
-
+void glitch2(uint8_t color1[3], uint8_t color2[3], uint8_t duration) {
     // Part 1: Rapidly flash between black and background for 1 second
     unsigned long flashStartTime = millis();
-    bool isBlack = true;
-
-    while (millis() - flashStartTime < 1000) { // 1 second flash period
-        if (isBlack) {
-            showColor(black, black, 20); // Show black for 20ms
-        } else {
-            showColor(swatch[swNum].accent, swatch[swNum].accent, 20);
-        }
-        isBlack = !isBlack; // Toggle between black and background
+    while (millis() - flashStartTime < 500) { // 1 second flash period
+        rapidPulse(color1, color2, 50);
     }
 
     // Part 2: Rapidly fade through all swatch colors from background to highlight
     uint8_t fadeTime = 50; // Quick fade time between colors
-
     // Fade through the colors in sequence: background → accent → ambient → primary → highlight
     fadeToColor(swatch[swNum].background, swatch[swNum].background, fadeTime);
     fadeToColor(swatch[swNum].accent, swatch[swNum].accent, fadeTime);
@@ -341,16 +301,27 @@ void glitch3(const uint8_t duration) {
     fadeToColor(swatch[swNum].highlight, swatch[swNum].highlight, fadeTime);
 }
 
-// MARK: rapidPulse ------------------------------------------------------------------------------------------
-void rapidPulse(const uint8_t segment, const uint8_t color1, const uint8_t color2){
+// MARK: glitch3 ------------------------------------------------------------------------------------------
+void glitch3(uint8_t segment, uint8_t color2[3], uint8_t duration,  uint8_t reps) {
+    uint8_t startColor[3] = {handoverColor[segment][0], handoverColor[segment][1], handoverColor[segment][2]};
     uint8_t otherSegment = 0;
-    uint8_t flickerTime = 50;
-    sendToRGB(segment, swatch[swNum].primary);
+    if (segment == 0) {otherSegment = 1;}
+    // Hold otherSegment at its handoverColor, and flash segment between startColor and color2 twice
+    for (int reps = 0; reps < 3; reps++) {
+        if (segment == 0) {
+            showColor(startColor, handoverColor[1], duration);
+            showColor(color2, handoverColor[1], duration);
+        } else {
+            showColor(handoverColor[0], startColor, duration);
+            showColor(handoverColor[0], color2, duration);
+        }
+    }
 }
 
-// MARK: miniPulse ------------------------------------------------------------------------------------------
-void miniPulse(const uint8_t segment, const uint8_t color[3], const uint8_t fadeTime){
-    // Fade to the color
-    fadeToColor(swatch[swNum].background, color, fadeTime);
+// MARK: rapidPulse ------------------------------------------------------------------------------------------
+void rapidPulse(uint8_t color1[3], uint8_t color2[3], uint8_t speed){
+    showColor(color1, color1, speed);
+    showColor(color2, color2, speed);
 }
+
 // ------------------------------------------------------------------------------------------------------------------
