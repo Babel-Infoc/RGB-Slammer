@@ -93,47 +93,47 @@ void loop() {
 // MARK: pulseColor -------------------------------------------------------------------------------------------------
 // Pulses from highlight through to background colors in the active swatch, over <speed> milliseconds
 void pulseColor(const uint8_t duration){
-    fadeToColor(swArr[swInx].highlight,  swArr[swInx].highlight,   (duration/2));
-    fadeToColor(swArr[swInx].primary,    swArr[swInx].primary,     (duration));
-    fadeToColor(swArr[swInx].ambient,    swArr[swInx].ambient,     (duration));
-    fadeToColor(swArr[swInx].accent,     swArr[swInx].accent,      (duration));
-    fadeToColor(swArr[swInx].highlight,  swArr[swInx].highlight,   (duration/2));
-    fadeToColor(swArr[swInx].primary,    swArr[swInx].primary,     (duration));
-    fadeToColor(swArr[swInx].ambient,    swArr[swInx].ambient,     (duration*2));
-    fadeToColor(swArr[swInx].accent,     swArr[swInx].accent,      (duration*4));
-    fadeToColor(swArr[swInx].background, swArr[swInx].background,  (duration*6));
+    fadeToColor(swatch[swNum].highlight,  swatch[swNum].highlight,   (duration/2));
+    fadeToColor(swatch[swNum].primary,    swatch[swNum].primary,     (duration));
+    fadeToColor(swatch[swNum].ambient,    swatch[swNum].ambient,     (duration));
+    fadeToColor(swatch[swNum].accent,     swatch[swNum].accent,      (duration));
+    fadeToColor(swatch[swNum].highlight,  swatch[swNum].highlight,   (duration/2));
+    fadeToColor(swatch[swNum].primary,    swatch[swNum].primary,     (duration));
+    fadeToColor(swatch[swNum].ambient,    swatch[swNum].ambient,     (duration*2));
+    fadeToColor(swatch[swNum].accent,     swatch[swNum].accent,      (duration*4));
+    fadeToColor(swatch[swNum].background, swatch[swNum].background,  (duration*6));
 }
 
 // MARK: progressiveFade --------------------------------------------------------------------------------------------
 // Fades through all colors in the active swatch in order, over <duration> milliseconds
 void progressiveFade1(const unsigned int duration) {
-    fadeToColor(swArr[swInx].accent,     swArr[swInx].accent,      duration);
-    fadeToColor(swArr[swInx].ambient,    swArr[swInx].ambient,     duration);
-    fadeToColor(swArr[swInx].primary,    swArr[swInx].primary,     duration);
-    fadeToColor(swArr[swInx].highlight,  swArr[swInx].highlight,   duration);
-    fadeToColor(swArr[swInx].primary,    swArr[swInx].primary,     duration);
-    fadeToColor(swArr[swInx].ambient,    swArr[swInx].ambient,     duration);
-    fadeToColor(swArr[swInx].accent,     swArr[swInx].accent,      duration);
-    fadeToColor(swArr[swInx].background, swArr[swInx].background,  duration);
+    fadeToColor(swatch[swNum].accent,     swatch[swNum].accent,      duration);
+    fadeToColor(swatch[swNum].ambient,    swatch[swNum].ambient,     duration);
+    fadeToColor(swatch[swNum].primary,    swatch[swNum].primary,     duration);
+    fadeToColor(swatch[swNum].highlight,  swatch[swNum].highlight,   duration);
+    fadeToColor(swatch[swNum].primary,    swatch[swNum].primary,     duration);
+    fadeToColor(swatch[swNum].ambient,    swatch[swNum].ambient,     duration);
+    fadeToColor(swatch[swNum].accent,     swatch[swNum].accent,      duration);
+    fadeToColor(swatch[swNum].background, swatch[swNum].background,  duration);
 }
 
 void progressiveFade2(const unsigned int duration) {
-    fadeToColor(swArr[swInx].accent,     swArr[swInx].primary,      duration);
-    fadeToColor(swArr[swInx].ambient,    swArr[swInx].ambient,      duration);
-    fadeToColor(swArr[swInx].primary,    swArr[swInx].accent,       duration);
-    fadeToColor(swArr[swInx].highlight,  swArr[swInx].background,   duration);
-    fadeToColor(swArr[swInx].primary,    swArr[swInx].accent,       duration);
-    fadeToColor(swArr[swInx].ambient,    swArr[swInx].ambient,      duration);
-    fadeToColor(swArr[swInx].accent,     swArr[swInx].primary,      duration);
-    fadeToColor(swArr[swInx].background, swArr[swInx].highlight,    duration);
+    fadeToColor(swatch[swNum].accent,     swatch[swNum].primary,      duration);
+    fadeToColor(swatch[swNum].ambient,    swatch[swNum].ambient,      duration);
+    fadeToColor(swatch[swNum].primary,    swatch[swNum].accent,       duration);
+    fadeToColor(swatch[swNum].highlight,  swatch[swNum].background,   duration);
+    fadeToColor(swatch[swNum].primary,    swatch[swNum].accent,       duration);
+    fadeToColor(swatch[swNum].ambient,    swatch[swNum].ambient,      duration);
+    fadeToColor(swatch[swNum].accent,     swatch[swNum].primary,      duration);
+    fadeToColor(swatch[swNum].background, swatch[swNum].highlight,    duration);
 }
 
 void progressiveFade3(const unsigned int duration) {
-    fadeToColor(swArr[swInx].highlight,  swArr[swInx].background,   duration);
-    fadeToColor(swArr[swInx].primary,    swArr[swInx].highlight,    duration);
-    fadeToColor(swArr[swInx].ambient,    swArr[swInx].primary,      duration);
-    fadeToColor(swArr[swInx].accent,     swArr[swInx].ambient,      duration);
-    fadeToColor(swArr[swInx].background, swArr[swInx].accent,       duration);
+    fadeToColor(swatch[swNum].highlight,  swatch[swNum].background,   duration);
+    fadeToColor(swatch[swNum].primary,    swatch[swNum].highlight,    duration);
+    fadeToColor(swatch[swNum].ambient,    swatch[swNum].primary,      duration);
+    fadeToColor(swatch[swNum].accent,     swatch[swNum].ambient,      duration);
+    fadeToColor(swatch[swNum].background, swatch[swNum].accent,       duration);
 }
 
 // MARK: randomFade -------------------------------------------------------------------------------------------------
@@ -149,20 +149,20 @@ void randomFade(const uint8_t min, const uint8_t max) {
 
     // Select the first color based on the random index
     switch (color1) {
-        case 0: firstColor = swArr[swInx].highlight; break;
-        case 1: firstColor = swArr[swInx].primary; break;
-        case 2: firstColor = swArr[swInx].ambient; break;
-        case 3: firstColor = swArr[swInx].accent; break;
-        case 4: firstColor = swArr[swInx].background; break;
+        case 0: firstColor = swatch[swNum].highlight; break;
+        case 1: firstColor = swatch[swNum].primary; break;
+        case 2: firstColor = swatch[swNum].ambient; break;
+        case 3: firstColor = swatch[swNum].accent; break;
+        case 4: firstColor = swatch[swNum].background; break;
     }
 
     // Select the second color based on the random index
     switch (color2) {
-        case 0: secondColor = swArr[swInx].highlight; break;
-        case 1: secondColor = swArr[swInx].primary; break;
-        case 2: secondColor = swArr[swInx].ambient; break;
-        case 3: secondColor = swArr[swInx].accent; break;
-        case 4: secondColor = swArr[swInx].background; break;
+        case 0: secondColor = swatch[swNum].highlight; break;
+        case 1: secondColor = swatch[swNum].primary; break;
+        case 2: secondColor = swatch[swNum].ambient; break;
+        case 3: secondColor = swatch[swNum].accent; break;
+        case 4: secondColor = swatch[swNum].background; break;
     }
 
     // Fade between the two random colors with a random duration
@@ -205,20 +205,20 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const u
 void bounceBoot(uint8_t speed){
     for (uint8_t reps = 0; reps < 3; reps++) {
         if (reps == 2) speed = speed * 3;
-        fadeToColor(swArr[swInx].highlight,  swArr[swInx].background,   speed);
-        fadeToColor(swArr[swInx].primary,    swArr[swInx].highlight,    speed);
-        fadeToColor(swArr[swInx].ambient,    swArr[swInx].primary,      speed);
-        fadeToColor(swArr[swInx].accent,     swArr[swInx].ambient,      speed);
-        fadeToColor(swArr[swInx].background, swArr[swInx].accent,       speed);
-        fadeToColor(swArr[swInx].background, swArr[swInx].background,   speed);
+        fadeToColor(swatch[swNum].highlight,  swatch[swNum].background,   speed);
+        fadeToColor(swatch[swNum].primary,    swatch[swNum].highlight,    speed);
+        fadeToColor(swatch[swNum].ambient,    swatch[swNum].primary,      speed);
+        fadeToColor(swatch[swNum].accent,     swatch[swNum].ambient,      speed);
+        fadeToColor(swatch[swNum].background, swatch[swNum].accent,       speed);
+        fadeToColor(swatch[swNum].background, swatch[swNum].background,   speed);
     }
-    showColor(swArr[swInx].background, swArr[swInx].background, speed*5);
+    showColor(swatch[swNum].background, swatch[swNum].background, speed*5);
 }
 
 // MARK: holdYourColor ------------------------------------------------------------------------------------------------
 // Shows the primary color only
 void holdYourColorPrimary(){
-    showColor(swArr[swInx].primary, swArr[swInx].primary, 100);
+    showColor(swatch[swNum].primary, swatch[swNum].primary, 100);
 }
 
 // MARK: --- Animation processor
@@ -262,10 +262,10 @@ void flicker(const uint8_t chance, const float intensity){
         if (random(0, 100) < chance) {
             // Averate between primary and background by intensity
             for (int pin = 0; pin < 3; pin++) {
-                flickerOutput[segment][pin] = swArr[swInx].primary[pin] * (1 - intensity) + swArr[swInx].background[pin] * intensity;
+                flickerOutput[segment][pin] = swatch[swNum].primary[pin] * (1 - intensity) + swatch[swNum].background[pin] * intensity;
             }
         } else {
-            sendToRGB(segment, swArr[swInx].primary);
+            sendToRGB(segment, swatch[swNum].primary);
         }
     }
 }
@@ -275,11 +275,11 @@ void glitch1(const uint8_t segment){
     uint8_t otherSegment = 0;
     uint8_t flickerTime = 50;
     if (segment == 0) {
-        showColor(swArr[swInx].accent, swArr[swInx].primary,50);
-        showColor(swArr[swInx].accent, swArr[swInx].background,50);
+        showColor(swatch[swNum].accent, swatch[swNum].primary,50);
+        showColor(swatch[swNum].accent, swatch[swNum].background,50);
     } else {
-        showColor(swArr[swInx].primary, swArr[swInx].accent,50);
-        showColor(swArr[swInx].background, swArr[swInx].accent,50);
+        showColor(swatch[swNum].primary, swatch[swNum].accent,50);
+        showColor(swatch[swNum].background, swatch[swNum].accent,50);
     }
 }
 
@@ -295,11 +295,11 @@ void glitch2(const uint8_t duration) {
             float randomFactor1 = random(0, 100) / 100.0;
             float randomFactor2 = random(0, 100) / 100.0;
 
-            glitchColor1[i] = swArr[swInx].highlight[i] * randomFactor1 +
-                             swArr[swInx].accent[i] * (1 - randomFactor1);
+            glitchColor1[i] = swatch[swNum].highlight[i] * randomFactor1 +
+                             swatch[swNum].accent[i] * (1 - randomFactor1);
 
-            glitchColor2[i] = swArr[swInx].primary[i] * randomFactor2 +
-                             swArr[swInx].background[i] * (1 - randomFactor2);
+            glitchColor2[i] = swatch[swNum].primary[i] * randomFactor2 +
+                             swatch[swNum].background[i] * (1 - randomFactor2);
         }
 
         // Show the glitch colors for a very short time
@@ -307,7 +307,7 @@ void glitch2(const uint8_t duration) {
 
         // Brief blackout between flashes
         if (random(0, 100) < 30) {
-            showColor(swArr[swInx].background, swArr[swInx].background, random(5, 20));
+            showColor(swatch[swNum].background, swatch[swNum].background, random(5, 20));
         }
     }
 }
@@ -325,7 +325,7 @@ void glitch3(const uint8_t duration) {
         if (isBlack) {
             showColor(black, black, 20); // Show black for 20ms
         } else {
-            showColor(swArr[swInx].accent, swArr[swInx].accent, 20);
+            showColor(swatch[swNum].accent, swatch[swNum].accent, 20);
         }
         isBlack = !isBlack; // Toggle between black and background
     }
@@ -334,23 +334,23 @@ void glitch3(const uint8_t duration) {
     uint8_t fadeTime = 50; // Quick fade time between colors
 
     // Fade through the colors in sequence: background → accent → ambient → primary → highlight
-    fadeToColor(swArr[swInx].background, swArr[swInx].background, fadeTime);
-    fadeToColor(swArr[swInx].accent, swArr[swInx].accent, fadeTime);
-    fadeToColor(swArr[swInx].ambient, swArr[swInx].ambient, fadeTime);
-    fadeToColor(swArr[swInx].primary, swArr[swInx].primary, fadeTime);
-    fadeToColor(swArr[swInx].highlight, swArr[swInx].highlight, fadeTime);
+    fadeToColor(swatch[swNum].background, swatch[swNum].background, fadeTime);
+    fadeToColor(swatch[swNum].accent, swatch[swNum].accent, fadeTime);
+    fadeToColor(swatch[swNum].ambient, swatch[swNum].ambient, fadeTime);
+    fadeToColor(swatch[swNum].primary, swatch[swNum].primary, fadeTime);
+    fadeToColor(swatch[swNum].highlight, swatch[swNum].highlight, fadeTime);
 }
 
 // MARK: rapidPulse ------------------------------------------------------------------------------------------
 void rapidPulse(const uint8_t segment, const uint8_t color1, const uint8_t color2){
     uint8_t otherSegment = 0;
     uint8_t flickerTime = 50;
-    sendToRGB(segment, swArr[swInx].primary);
+    sendToRGB(segment, swatch[swNum].primary);
 }
 
 // MARK: miniPulse ------------------------------------------------------------------------------------------
 void miniPulse(const uint8_t segment, const uint8_t color[3], const uint8_t fadeTime){
     // Fade to the color
-    fadeToColor(swArr[swInx].background, color, fadeTime);
+    fadeToColor(swatch[swNum].background, color, fadeTime);
 }
 // ------------------------------------------------------------------------------------------------------------------

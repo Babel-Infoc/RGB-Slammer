@@ -63,7 +63,7 @@ void checkButtons() {
         uint8_t colorButtonState = digitalRead(colorBtn);
         if (colorButtonState != colorButtonLastState) {
             if (colorButtonState == LOW) {
-                swInx = (swInx + 1) % numSwatches;
+                swNum = (swNum + 1) % numSwatches;
             }
             colorButtonLastState = colorButtonState;
         }

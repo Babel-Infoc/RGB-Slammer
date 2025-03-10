@@ -4,7 +4,8 @@
 // Define macro to convert rgb(r, g, b) to {r, g, b}
 #define rgb(r, g, b) {r, g, b}
 
-uint8_t swInx = 0;
+// Initialise the swatch array index
+uint8_t swNum = 0;
 
 /*
     highlight
@@ -14,7 +15,7 @@ uint8_t swInx = 0;
     background
 */
 // Master array of swatches
-swatch swArr[] = {
+swatchArray swatch[] = {
     {   // Anodized steel
         rgb(255, 220, 106),
         rgb(209, 0, 52),
@@ -102,7 +103,7 @@ swatch swArr[] = {
 };
 
 // Calculate the number of swatches automatically based on array size
-uint8_t numSwatches = sizeof(swArr) / sizeof(swArr[0]);
+uint8_t numSwatches = sizeof(swatch) / sizeof(swatch[0]);
 
 // Colors used for the bootup animation
 const uint8_t bootswatch[5][3] = {

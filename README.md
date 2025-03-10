@@ -19,10 +19,10 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
 - ### Swatch arrays
     Iterate or randomize animation colors through customisable and expandable swatches<br>Color swatches are configured with a standard structure:
     ```cpp
-    swArr[0].highlight;
-    swArr[0].primary;
-    swArr[0].accent;
-    swArr[0].background;
+    swatch[0].highlight;
+    swatch[0].primary;
+    swatch[0].accent;
+    swatch[0].background;
     ```
     Use `[0]` or `[1]` to set the color for the first or second led segment<br>Create or modify swatches in `swatches.cpp`
 - ### Automatic color tuning
