@@ -8,6 +8,8 @@ uint8_t animButtonLastState = HIGH;
 uint8_t animIndex = 0;
 uint8_t colorIndex = 0;
 
+uint8_t debounceStart = 0;
+
 // Replace std::array with plain C arrays to save significant flash memory
 float tuneRatio[3] = {1.0, 1.0, 1.0};
 uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
@@ -54,24 +56,33 @@ void calculateLuminance() {
 
 // MARK: Button Handling ------------------------------
 void checkButtons() {
-    // Check color button
-    uint8_t colorButtonState = digitalRead(colorBtn);
-    if (colorButtonState != colorButtonLastState) {
-        if (colorButtonState == LOW) {
-            swatchIndex = (swatchIndex + 1) % numSwatches;
+    if (debounceStart > 0) {
+        debounceStart--;
+    } else {
+        // Check color button
+        uint8_t colorButtonState = digitalRead(colorBtn);
+        if (colorButtonState != colorButtonLastState) {
+            if (colorButtonState == LOW) {
+                swNum = (swNum + 1) % numSwatches;
+            }
+            colorButtonLastState = colorButtonState;
         }
-        colorButtonLastState = colorButtonState;
-    }
 
-    // Check animation button
-    uint8_t animButtonState = digitalRead(animBtn);
-    if (animButtonState != animButtonLastState) {
-        if (animButtonState == LOW) {
-            animIndex = (animIndex + 1) % numAnimations;
+        // Check animation button
+        uint8_t animButtonState = digitalRead(animBtn);
+        if (animButtonState != animButtonLastState) {
+            if (animButtonState == LOW) {
+                animIndex = (animIndex + 1) % numAnimations;
+            }
+            animButtonLastState = animButtonState;
         }
-        animButtonLastState = animButtonState;
+
+        // Start the debounce timer
+        uint8_t debounceStart = 300;
     }
 }
+
+// MARK: Light sensor ------------------------------
 
 // MARK: RGB Processing ------------------------------
 // Function to process the raw RGB values to accurate and consistent luminosity and hue
@@ -96,9 +107,8 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
         digitalWrite(led[segment].blue, brightness < tunedRGB[2] ?     LOW : HIGH);
     }
 
-    // Check buttons once per frame
+    // Check buttons once per frame, with debounce handling
     checkButtons();
-
     // Slow down to prevent excessive CPU usage
-    delay(1);
+    delay(slowDown);
 }
