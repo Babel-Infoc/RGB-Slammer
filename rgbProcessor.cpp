@@ -73,6 +73,18 @@ void checkButtons() {
     }
 }
 
+// MARK: Light sensor ------------------------------
+void lightSensorHandler() {
+    // Read the light sensor as a float between 0 and 1
+    float lightSensorValue = analogRead(lightSensor) / 1023.0;
+    // Adjust the brightness based on the light sensor value
+    if (sensorEnabled){
+        brightnessMod = lightSensorValue * maxBrightness;
+    } else {
+        brightnessMod = maxBrightness;
+    }
+}
+
 // MARK: RGB Processing ------------------------------
 // Function to process the raw RGB values to accurate and consistent luminosity and hue
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
@@ -98,6 +110,9 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // Check buttons once per frame
     checkButtons();
+
+    // Check the light sensor once per frame
+    lightSensorHandler();
 
     // Slow down to prevent excessive CPU usage
     delay(1);

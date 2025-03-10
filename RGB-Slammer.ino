@@ -29,9 +29,11 @@ ledSegment led[2] = {
 const uint8_t colorBtn = PC3;
 const uint8_t animBtn = PC0;
 
-// Maximum brightness modifier, 0-100
-const float maxBrightness = 0.5;
-// ToDo: Add an ambient brightness modifier
+// Ambient brightness sensor setup
+const bool sensorEnabled = false;   // Is the ambient brightness sensor enabled?
+const uint8_t lightSensor = PC3;    // TEMT6000 light sensor pin
+const float maxBrightness = 0.6;    // Master brightness attenuation, between 0 and 1
+float brightnessMod = 0;            // Stores the sensor value
 
 // Luminosity modifiers
 // Define the light intensity of each LED color at the specified mA value
@@ -54,6 +56,9 @@ void setup() {
     // Set up the color and animation buttons
     pinMode(colorBtn, INPUT_PULLUP);
     pinMode(animBtn, INPUT_PULLUP);
+
+    // Set up the light sensor
+    pinMode(lightSensor, INPUT);
 
     // Calculate the luminosity modifiers
     calculateLuminance();
