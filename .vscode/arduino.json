@@ -2,6 +2,6 @@
     "board": "WCH:ch32v:CH32V00x_EVT",
     "sketch": "RGB-Slammer.ino",
     "configuration": "pnum=CH32V003F4,upload_method=swdMethod,opt=osstd,dbg=none,rtlib=nano",
-    "output": "./.build",
+    "output": "./build",
     "port": "COM4"
 }
