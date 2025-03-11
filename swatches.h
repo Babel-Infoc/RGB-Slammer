@@ -5,10 +5,10 @@
 // MARK: ------------------------------ Swatch definitions ------------------------------
 // Swatch structure, 4 RGB arrays
 struct swatchArray {
-    uint8_t highlight[3];
     uint8_t primary[3];
-    uint8_t ambient[3];
     uint8_t accent[3];
+    uint8_t midtone[3];
+    uint8_t contrast[3];
     uint8_t background[3];
 };
 
