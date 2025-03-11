@@ -17,10 +17,10 @@ uint8_t swNum = 0;
 // Master array of swatches
 swatchArray swatch[] = {
     {   // Anodized steel
-        rgb(255, 220, 106),
-        rgb(209, 0, 52),
-        rgb(75,0,130),
-        rgb(0, 0, 97),
+        rgb(255, 196, 0),
+        rgb(255, 0, 64),
+        rgb(105, 0, 180),
+        rgb(0, 0, 138),
         rgb(0,0,0),
     },
     {   // Bright cyan to dark purple
@@ -38,7 +38,7 @@ swatchArray swatch[] = {
         rgb(130, 0, 0),      // Dark red background
     },
     {   // Chemical spill
-        rgb(159, 255, 167),    // Acid green primary
+        rgb(166, 255, 0),    // Acid green primary
         rgb(145, 255, 0),   // Bright lime accent
         rgb(117, 0, 226),    // Mid-tone midtone
         rgb(93, 17, 180),    // Purple contrast
@@ -113,3 +113,28 @@ const uint8_t bootswatch[5][3] = {
     rgb(0, 0, 97),
     rgb(0,0,0)
 };
+
+// MARK: gradientPosition ------------------------------------------------------------------------------------------------
+// Calculates a gradient rgb color between all 5 colors in the current swatch
+// position: 255 = background color, 0 = primary color
+rgb_t gradientPosition(uint8_t position) {
+    // Create an rgb_t object to return
+    rgb_t result;
+    uint8_t segment = position >> 6;    // Divide by 64 (4 segments of 64 steps each) (inv_position >> 6)
+    uint8_t step = position & 0x3F;     // Get remainder (0-63) (inv_position & 0x3F)
+    // Clamp segment to valid range (segment > 3)
+    if (segment > 3) segment = 3;
+    // Calculate pointers to start and end colors (startColor, endColor)
+    const uint8_t* startColor = &swatch[swNum].primary[0] + (4 - segment) * 3;
+    const uint8_t* endColor = &swatch[swNum].primary[0] + (3 - segment) * 3;
+
+    // Calculate interpolation factor (0-63 to 0-255)
+    uint8_t alpha = step << 2;  // Multiply by 4 to scale 0-63 to 0-252
+
+    // Linear interpolation between colors
+    result.r = ((uint16_t)endColor[0] * alpha + (uint16_t)startColor[0] * (255 - alpha)) >> 8;
+    result.g = ((uint16_t)endColor[1] * alpha + (uint16_t)startColor[1] * (255 - alpha)) >> 8;
+    result.b = ((uint16_t)endColor[2] * alpha + (uint16_t)startColor[2] * (255 - alpha)) >> 8;
+
+    return result;
+}
