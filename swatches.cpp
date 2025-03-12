@@ -59,10 +59,10 @@ swatchArray swatch[] = {
         rgb(0, 0, 0),        // Black background
     },
     {   // Cyberdoll
-        rgb(180, 120, 220),    // Light purple primary
-        rgb(120, 80, 180),     // Medium purple accent
-        rgb(90, 60, 140),      // Deep purple midtone
-        rgb(70, 70, 90),       // Purple-grey contrast
+        rgb(162, 62, 230),    // Light purple primary
+        rgb(99, 45, 180),     // Medium purple accent
+        rgb(71, 18, 158),      // Deep purple midtone
+        rgb(86, 86, 129),       // Purple-grey contrast
         rgb(40, 40, 50),       // Dark grey background
     },
     {   // Baby Pink
@@ -95,9 +95,9 @@ swatchArray swatch[] = {
     },
     {   // Hazard pay
         rgb(255, 255, 0),
-        rgb(255, 136, 0),
-        rgb(255, 38, 0),
-        rgb(155, 23, 0),
+        rgb(255, 51, 0),
+        rgb(238, 255, 0),
+        rgb(155, 132, 0),
         rgb(133, 0, 0),
     }
 };

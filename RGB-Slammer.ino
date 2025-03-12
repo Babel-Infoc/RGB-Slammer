@@ -172,7 +172,7 @@ void randomFade(const int min, const int max) {
 
 // MARK: glitchLoop ------------------------------------------------------------------------------------------------
 // Advanced neon flicker with 3 different animation patterns selected randomly
-void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const uint8_t duration) {
+void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const int duration) {
     // For <duration> milliseconds, both LED segments will either play a special animation or the normal flicker
     unsigned long startTime = millis();
     unsigned long currentTime = millis();
@@ -184,16 +184,16 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const u
             // Pick a random glitch effect
             switch (random(0, 5)) {
                 case 0:
-                    glitch1(flickerSegment);
+                    glitch1(flickerSegment, 700);
                     break;
                 case 1:
-                    glitch2(swatch[swNum].midtone ,swatch[swNum].contrast, flickerSegment);
+                    glitch2(swatch[swNum].midtone ,swatch[swNum].contrast, 700);
                     break;
                 case 2:
                     glitch3(flickerSegment, swatch[swNum].primary, 20, 3);
                     break;
                 case 3:
-                    glitch4(6, 250);
+                    glitch4(6, 700);
                     break;
                 case 4:
                     glitch5();
@@ -208,7 +208,7 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const u
 }
 
 // MARK: bounceBoot ----------------------------------------------------------------------------------------------------
-void bounceBoot(uint8_t speed){
+void bounceBoot(int speed){
     for (uint8_t reps = 0; reps < 3; reps++) {
         if (reps == 2) speed = speed * 3;
         fadeToColor(swatch[swNum].primary,      swatch[swNum].background,   speed);
@@ -253,7 +253,7 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 }
 
 // MARK: showColor -----------------------------------------------------------------------------------------------
-void showColor(uint8_t color1[3], uint8_t color2[3], uint8_t duration){
+void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
     unsigned long startTime = millis();
     while (millis() - startTime < duration) {
         sendToRGB(0, color1);
@@ -272,23 +272,26 @@ void flicker(const uint8_t chance, const uint8_t min, const uint8_t max){
 }
 
 // MARK: glitch1 ------------------------------------------------------------------------------------------
-void glitch1(const uint8_t segment){
+void glitch1(const uint8_t segment, int duration){
     uint8_t otherSegment = 0;
     uint8_t flickerTime = 50;
-    if (segment == 0) {
-        showColor(swatch[swNum].contrast, swatch[swNum].accent,50);
-        showColor(swatch[swNum].contrast, swatch[swNum].background,50);
-    } else {
-        showColor(swatch[swNum].accent, swatch[swNum].contrast,50);
-        showColor(swatch[swNum].background, swatch[swNum].contrast,50);
+    unsigned long flashStartTime = millis();
+    while (millis() - flashStartTime < duration) {
+        if (segment == 0) {
+            showColor(swatch[swNum].contrast, swatch[swNum].accent,50);
+            showColor(swatch[swNum].contrast, swatch[swNum].background,50);
+        } else {
+            showColor(swatch[swNum].accent, swatch[swNum].contrast,50);
+            showColor(swatch[swNum].background, swatch[swNum].contrast,50);
+        }
     }
 }
 
 // MARK: glitch2 ------------------------------------------------------------------------------------------
-void glitch2(uint8_t color1[3], uint8_t color2[3], uint8_t duration) {
+void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
     // Part 1: Rapidly flash between black and background for 1 second
     unsigned long flashStartTime = millis();
-    while (millis() - flashStartTime < 500) { // 1 second flash period
+    while (millis() - flashStartTime < duration) {
         rapidPulse(color1, color2, 50);
     }
 
@@ -303,7 +306,7 @@ void glitch2(uint8_t color1[3], uint8_t color2[3], uint8_t duration) {
 }
 
 // MARK: glitch3 ------------------------------------------------------------------------------------------
-void glitch3(uint8_t segment, uint8_t color2[3], uint8_t duration,  uint8_t reps) {
+void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     uint8_t startColor[3] = {handoverColor[segment][0], handoverColor[segment][1], handoverColor[segment][2]};
     uint8_t otherSegment = 0;
     if (segment == 0) {otherSegment = 1;}
@@ -320,7 +323,7 @@ void glitch3(uint8_t segment, uint8_t color2[3], uint8_t duration,  uint8_t reps
 }
 
 // MARK: glitch4 ------------------------------------------------------------------------------------------
-void glitch4(uint8_t reps, uint8_t duration) {
+void glitch4(uint8_t reps, int duration) {
     uint8_t color[3];
     unsigned long start = millis();
     while (millis() - start < duration) {
@@ -380,7 +383,7 @@ void envelopeFade(uint8_t index){
 }
 
 // MARK: rapidPulse ------------------------------------------------------------------------------------------
-void rapidPulse(uint8_t color1[3], uint8_t color2[3], uint8_t speed){
+void rapidPulse(uint8_t color1[3], uint8_t color2[3], int speed){
     showColor(color1, color1, speed);
     showColor(color2, color2, speed);
 }
