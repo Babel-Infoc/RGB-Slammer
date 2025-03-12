@@ -26,23 +26,23 @@ swatchArray swatch[] = {
     {   // Bright cyan to dark purple
         rgb(0, 255, 255),    // Bright cyan primary
         rgb(0, 180, 220),    // Cyan-blue accent
-        rgb(50, 120, 180),   // Mid-tone blue midtone
-        rgb(100, 70, 180),   // Blue-purple contrast
-        rgb(60, 0, 100),     // Dark purple background
+        rgb(17, 103, 179),   // Mid-tone blue midtone
+        rgb(68, 23, 190),   // Blue-purple contrast
+        rgb(85, 0, 141),     // Dark purple background
     },
     {   // Yellow to dark red
         rgb(255, 255, 0),    // Vivid yellow primary
         rgb(255, 136, 0),    // Golden yellow accent
         rgb(255, 150, 0),    // Orange midtone
         rgb(220, 60, 0),     // Bright red contrast
-        rgb(130, 0, 0),      // Dark red background
+        rgb(184, 0, 0),      // Dark red background
     },
     {   // Chemical spill
         rgb(166, 255, 0),    // Acid green primary
         rgb(145, 255, 0),   // Bright lime accent
-        rgb(117, 0, 226),    // Mid-tone midtone
-        rgb(93, 17, 180),    // Purple contrast
-        rgb(40, 0, 80),      // Dark purple background
+        rgb(0, 181, 226),    // Mid-tone midtone
+        rgb(90, 0, 194),    // Purple contrast
+        rgb(65, 0, 131),      // Dark purple background
     },
     {   // Neon
         rgb(255, 0, 255),    // Bright magenta primary

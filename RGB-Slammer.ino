@@ -11,6 +11,7 @@ https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token
 #include <Arduino.h>
 #include "types.h"
 #include "swatches.h"
+#include "envelopes.h"
 
 // Define numLEDs here instead of in types.h to avoid multiple definitions
 const uint8_t numLEDs = 2;
@@ -27,7 +28,7 @@ const uint8_t colorBtn = PC3;
 const uint8_t animBtn = PC0;
 
 // Maximum brightness modifier, 0-100
-const float maxBrightness = 0.6;
+const float maxBrightness = 1;
 
 // ToDo: Add an midtone brightness modifier
 
@@ -73,8 +74,8 @@ extern const uint8_t numAnimations = 7;
 
 void loop() {
     switch (animIndex) {
-        case 0: flicker(50, 150); break;
-        //case 0: glitchLoop(70, 10, 1000); break;
+        //case 0: envelopeFade(0); break;
+        case 0: glitchLoop(70, 15, 1000); break;
         case 1: progressiveFade1(5000); break;
         case 2: gradientWave(5000); break;
         case 3: progressiveFade2(700); break;
@@ -181,7 +182,7 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const u
             // Apply a special effect
             uint8_t flickerSegment = random(0, numLEDs);
             // Pick a random glitch effect
-            switch (random(0, 3)) {
+            switch (random(0, 5)) {
                 case 0:
                     glitch1(flickerSegment);
                     break;
@@ -191,11 +192,16 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const u
                 case 2:
                     glitch3(flickerSegment, swatch[swNum].primary, 20, 3);
                     break;
+                case 3:
+                    glitch4(6, 250);
+                    break;
+                case 4:
+                    glitch5();
             }
             currentTime = millis();
         } else {
             // Normal flicker on both segments
-            flicker(flickerChance, 0.2);
+            flicker(flickerChance, 50, 150);
             currentTime = millis();
         }
     }
@@ -256,11 +262,11 @@ void showColor(uint8_t color1[3], uint8_t color2[3], uint8_t duration){
 }
 
 // MARK: flicker ---------------------------------------------------------------------------------------------
-void flicker(const uint8_t chance, const uint8_t intensity){
+void flicker(const uint8_t chance, const uint8_t min, const uint8_t max){
     uint8_t outputColor[3];
     for (uint8_t segment = 0; segment < numLEDs; segment++) {
-        uint8_t flickerIntensity = random(intensity, 255);
-        gradientPosition(flickerIntensity, outputColor);
+        uint8_t range = random(min, max);
+        gradientPosition(range, outputColor);
         sendToRGB(segment, outputColor);
     }
 }
@@ -310,6 +316,66 @@ void glitch3(uint8_t segment, uint8_t color2[3], uint8_t duration,  uint8_t reps
             showColor(handoverColor[0], startColor, duration);
             showColor(handoverColor[0], color2, duration);
         }
+    }
+}
+
+// MARK: glitch4 ------------------------------------------------------------------------------------------
+void glitch4(uint8_t reps, uint8_t duration) {
+    uint8_t color[3];
+    unsigned long start = millis();
+    while (millis() - start < duration) {
+        for (uint8_t segment = 0; segment < numLEDs; segment++) {
+            gradientPosition(random(1, 255), color);
+            for (uint8_t i = 0; i < reps; i++) {
+                sendToRGB(segment, color);
+                sendToRGB(segment, swatch[swNum].contrast);
+            }
+        }
+    }
+}
+
+// MARK: glitch5 ------------------------------------------------------------------------------------------
+void glitch5(){
+    // Use one of the envelope arrays from envelopes.cpp
+    uint8_t envelopeIndex = random(0, 2); // Choose between the two available envelopes
+    uint8_t outputColor[3];
+
+    // First play through the envelope once
+    for (uint8_t i = 0; i < 32; i++) {
+        // Get color at this position in the gradient
+        gradientPosition(envelope[envelopeIndex].envelope[i], outputColor);
+
+        // Show this color on both LEDs briefly
+        showColor(outputColor, outputColor, 50);
+
+        // Brief black flash every few steps for a glitchy effect
+        if (i % 4 == 0) {
+            uint8_t blackColor[3] = {0, 0, 0};
+            showColor(blackColor, blackColor, 10);
+        }
+    }
+
+    // Then do some rapid random jumps between envelope positions
+    for (uint8_t i = 0; i < 8; i++) {
+        uint8_t randomPos = random(0, 32);
+        gradientPosition(envelope[envelopeIndex].envelope[randomPos], outputColor);
+        showColor(outputColor, outputColor, 30);
+
+        // Brief flashes to black between jumps
+        uint8_t blackColor[3] = {0, 0, 0};
+        showColor(blackColor, blackColor, 15);
+    }
+
+    // End with a final dramatic fade to black
+    fadeToColor(swatch[swNum].contrast, swatch[swNum].background, 300);
+}
+
+// MARK: envelopeFade ------------------------------------------------------------------------------------------
+void envelopeFade(uint8_t index){
+    uint8_t outputColor[3];
+    for (uint8_t i = 0; i < 32; i++) {
+        gradientPosition(envelope[index].envelope[i], outputColor);
+        showColor(outputColor, outputColor, 50);
     }
 }
 
