@@ -73,9 +73,10 @@ extern const uint8_t numAnimations = 7;
 
 void loop() {
     switch (animIndex) {
-        case 0: gradientWave(5000); break;
+        case 0: flicker(50, 150); break;
+        //case 0: glitchLoop(70, 10, 1000); break;
         case 1: progressiveFade1(5000); break;
-        case 2: glitchLoop(70, 10, 1000); break;
+        case 2: gradientWave(5000); break;
         case 3: progressiveFade2(700); break;
         case 4: progressiveFade3(900); break;
         case 5: randomFade(20, 2000); break;
@@ -255,35 +256,12 @@ void showColor(uint8_t color1[3], uint8_t color2[3], uint8_t duration){
 }
 
 // MARK: flicker ---------------------------------------------------------------------------------------------
-void flicker(const uint8_t chance, const float intensity){
-    uint8_t flickerOutput[2][3];
-    uint8_t mixColor[3];
+void flicker(const uint8_t chance, const uint8_t intensity){
+    uint8_t outputColor[3];
     for (uint8_t segment = 0; segment < numLEDs; segment++) {
-        int randomInt = random(0, 4);
-            // Choose a color from swatch based on randomInt (1-4)
-            switch (randomInt) {
-                case 0:
-                memcpy(mixColor, swatch[swNum].primary, 3);
-                break;
-                case 1:
-                memcpy(mixColor, swatch[swNum].accent, 3);
-                break;
-                case 2:
-                memcpy(mixColor, swatch[swNum].midtone, 3);
-                break;
-                case 3:
-                memcpy(mixColor, swatch[swNum].contrast, 3);
-                break;
-            }
-            // Apply the flicker effect
-            for (int i = 0; i < 3; i++) {
-                if (random(0, 100) < chance) {
-                flickerOutput[segment][i] = handoverColor[segment][i] * (1 - intensity) + mixColor[i] * intensity;
-                } else {
-                flickerOutput[segment][i] = handoverColor[segment][i];
-                }
-            }
-        sendToRGB(segment, flickerOutput[segment]);
+        uint8_t flickerIntensity = random(intensity, 255);
+        gradientPosition(flickerIntensity, outputColor);
+        sendToRGB(segment, outputColor);
     }
 }
 
@@ -344,26 +322,21 @@ void rapidPulse(uint8_t color1[3], uint8_t color2[3], uint8_t speed){
 // MARK: gradientWave ------------------------------------------------------------------------------------------
 void gradientWave(int speed){
     unsigned long start = millis();
+    uint8_t outputColor[3];
     // Fade up over <speed> milliseconds
     while (millis() - start < speed) {
         // count up from 0 to 255 over speed milliseconds
         uint8_t progress = (uint8_t)((millis() - start) * 255 / speed);
-        // Calculate the gradient position using the progress
-        rgb_t result = gradientPosition(progress);
-        // Convert the rgb_t to array format for showColor
-        uint8_t output[3] = {result.r, result.g, result.b};
-        showColor(output, output, 10);
+        gradientPosition(progress, outputColor);
+        showColor(outputColor, outputColor, 10);
     }
     // Fade down over <speed> milliseconds
     start = millis(); // Reset start time for fade down
     while (millis() - start < speed) {
         // count down from 255 to 0 over speed milliseconds
         uint8_t progress = (uint8_t)(255 - ((millis() - start) * 255 / speed));
-        // Calculate the gradient position using the progress
-        rgb_t result = gradientPosition(progress);
-        // Convert the rgb_t to array format for showColor
-        uint8_t output[3] = {result.r, result.g, result.b};
-        showColor(output, output, 10);
+        gradientPosition(progress, outputColor);
+        showColor(outputColor, outputColor, 10);
     }
 }
 

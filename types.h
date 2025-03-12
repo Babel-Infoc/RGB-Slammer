@@ -45,6 +45,9 @@ extern uint8_t colorIndex;
 extern const uint8_t numAnimations;
 extern uint8_t animIndex;
 
+// Flag to signal animation interruption
+extern bool animInterrupt;
+
 // MARK: ------------------------------ Functions ------------------------------
 void calculateLuminance();
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);

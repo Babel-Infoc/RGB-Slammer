@@ -9,6 +9,8 @@ uint8_t animIndex = 0;
 uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
+// Flag to signal animation interruption
+bool animInterrupt = false;
 
 // Replace std::array with plain C arrays to save significant flash memory
 float tuneRatio[3] = {1.0, 1.0, 1.0};
@@ -59,6 +61,8 @@ void checkButtons() {
     if (debounceStart > 0) {
         debounceStart--;
     } else {
+        // Reset the interrupt flag
+        animInterrupt = false;
         // Check color button
         uint8_t colorButtonState = digitalRead(colorBtn);
         if (colorButtonState != colorButtonLastState) {
@@ -73,12 +77,14 @@ void checkButtons() {
         if (animButtonState != animButtonLastState) {
             if (animButtonState == LOW) {
                 animIndex = (animIndex + 1) % numAnimations;
+                // Set the interrupt flag to break current animation
+                animInterrupt = true;
             }
             animButtonLastState = animButtonState;
         }
 
-        // Start the debounce timer
-        uint8_t debounceStart = 300;
+        // Restart the debounce timer
+        debounceStart = 300;
     }
 }
 

@@ -117,9 +117,8 @@ const uint8_t bootswatch[5][3] = {
 // MARK: gradientPosition ------------------------------------------------------------------------------------------------
 // Calculates a gradient rgb color between all 5 colors in the current swatch
 // position: 255 = background color, 0 = primary color
-rgb_t gradientPosition(uint8_t position) {
+void gradientPosition(uint8_t position, uint8_t output[3]) {
     // Create an rgb_t object to return
-    rgb_t result;
     uint8_t segment = position >> 6;    // Divide by 64 (4 segments of 64 steps each) (inv_position >> 6)
     uint8_t step = position & 0x3F;     // Get remainder (0-63) (inv_position & 0x3F)
     // Clamp segment to valid range (segment > 3)
@@ -132,9 +131,7 @@ rgb_t gradientPosition(uint8_t position) {
     uint8_t alpha = step << 2;  // Multiply by 4 to scale 0-63 to 0-252
 
     // Linear interpolation between colors
-    result.r = ((uint16_t)endColor[0] * alpha + (uint16_t)startColor[0] * (255 - alpha)) >> 8;
-    result.g = ((uint16_t)endColor[1] * alpha + (uint16_t)startColor[1] * (255 - alpha)) >> 8;
-    result.b = ((uint16_t)endColor[2] * alpha + (uint16_t)startColor[2] * (255 - alpha)) >> 8;
-
-    return result;
+    output[0] = ((uint16_t)endColor[0] * alpha + (uint16_t)startColor[0] * (255 - alpha)) >> 8;
+    output[1] = ((uint16_t)endColor[1] * alpha + (uint16_t)startColor[1] * (255 - alpha)) >> 8;
+    output[2] = ((uint16_t)endColor[2] * alpha + (uint16_t)startColor[2] * (255 - alpha)) >> 8;
 }
