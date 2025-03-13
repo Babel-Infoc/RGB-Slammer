@@ -11,7 +11,7 @@ https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token
 #include <Arduino.h>
 #include "types.h"
 #include "swatches.h"
-#include "envelopes.h"
+#include "waveforms.h"
 
 // Define numLEDs here instead of in types.h to avoid multiple definitions
 const uint8_t numLEDs = 2;
@@ -70,20 +70,19 @@ void setup() {
 =======================================================================================*/
 
 // How many animations in the loop
-extern const uint8_t numAnimations = 7;
+extern const uint8_t numAnimations = 8;
 
 void loop() {
     switch (animIndex) {
-        //case 0: envelopeFade(0); break;
-        case 0: glitchLoop(70, 15, 1000); break;
-        case 1: progressiveFade1(5000); break;
-        case 2: gradientWave(5000); break;
-        case 3: progressiveFade2(700); break;
-        case 4: progressiveFade3(900); break;
-        case 5: randomFade(20, 2000); break;
-        case 6: pulseColor(2500); break;
-        case 7: bounceBoot(50); break;
-        case 8: holdYourColorPrimary(); break;
+        //case 0: waveformFade(0); break;
+        case 0: glitchLoop(70, 20, 1000); break;
+        case 1: gradientWave(1000); break;
+        case 2: progressiveFade2(700); break;
+        case 3: progressiveFade3(900); break;
+        case 4: randomFade(20, 2000); break;
+        case 5: pulseColor(2500); break;
+        case 6: bounceBoot(50); break;
+        case 7: holdYourColorPrimary(); break;
     }
 }
 
@@ -339,14 +338,14 @@ void glitch4(uint8_t reps, int duration) {
 
 // MARK: glitch5 ------------------------------------------------------------------------------------------
 void glitch5(){
-    // Use one of the envelope arrays from envelopes.cpp
-    uint8_t envelopeIndex = random(0, 2); // Choose between the two available envelopes
+    // Use one of the waveform arrays from waveforms.cpp
+    uint8_t waveformIndex = random(0, 2); // Choose between the two available waveforms
     uint8_t outputColor[3];
 
-    // First play through the envelope once
+    // First play through the waveform once
     for (uint8_t i = 0; i < 32; i++) {
         // Get color at this position in the gradient
-        gradientPosition(envelope[envelopeIndex].envelope[i], outputColor);
+        gradientPosition(waveform[waveformIndex].waveform[i], outputColor);
 
         // Show this color on both LEDs briefly
         showColor(outputColor, outputColor, 50);
@@ -358,10 +357,10 @@ void glitch5(){
         }
     }
 
-    // Then do some rapid random jumps between envelope positions
+    // Then do some rapid random jumps between waveform positions
     for (uint8_t i = 0; i < 8; i++) {
         uint8_t randomPos = random(0, 32);
-        gradientPosition(envelope[envelopeIndex].envelope[randomPos], outputColor);
+        gradientPosition(waveform[waveformIndex].waveform[randomPos], outputColor);
         showColor(outputColor, outputColor, 30);
 
         // Brief flashes to black between jumps
@@ -373,11 +372,11 @@ void glitch5(){
     fadeToColor(swatch[swNum].contrast, swatch[swNum].background, 300);
 }
 
-// MARK: envelopeFade ------------------------------------------------------------------------------------------
-void envelopeFade(uint8_t index){
+// MARK: waveformFade ------------------------------------------------------------------------------------------
+void waveformFade(uint8_t index){
     uint8_t outputColor[3];
     for (uint8_t i = 0; i < 32; i++) {
-        gradientPosition(envelope[index].envelope[i], outputColor);
+        gradientPosition(waveform[index].waveform[i], outputColor);
         showColor(outputColor, outputColor, 50);
     }
 }

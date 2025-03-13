@@ -4,11 +4,11 @@
 
 // MARK: ------------------------------ Envelope definitions ------------------------------
 // Envelope structure, array of 32 brightness values, 0-255
-struct envelopeArray {
-    uint8_t envelope[32];
+struct waveformArray {
+    uint8_t waveform[32];
 };
 
-// Master envelope array
-extern envelopeArray envelope[];
+// Master waveform array
+extern waveformArray waveform[];
 
 #endif // ENVELOPES_H
