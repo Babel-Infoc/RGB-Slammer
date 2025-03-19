@@ -7,7 +7,6 @@ This script is best edited in VSCode, using the following extension:
 https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token
 */
 
-// MARK: ------------------------------ Variables and config ------------------------------
 #include <Arduino.h>
 #include "types.h"
 #include "swatches.h"
@@ -24,13 +23,11 @@ ledSegment led[2] = {
 };
 
 // Define the pins for the animation and color select buttons
-const uint8_t colorBtn = PC3;
-const uint8_t animBtn = PC0;
+const uint8_t colorBtn = PD6;
+const uint8_t animBtn = PD2;
 
-// Maximum brightness modifier, 0-100
-const float maxBrightness = 1;
-
-// ToDo: Add an midtone brightness modifier
+// Maximum brightness modifier, 0-255
+const float maxBrightness = 0.7;
 
 // Slow down all animations by this amount (in milliseconds)
 const uint8_t slowDown = 1;
@@ -42,7 +39,8 @@ const luminance red       = {8, 52};
 const luminance green     = {5, 163};
 const luminance blue      = {3, 18};
 
-// MARK: ------------------------------ Startup operations ------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: Setup
 void setup() {
     // Set up all LED segments
     for (uint8_t segment = 0; segment < 2; segment++) {
@@ -68,21 +66,24 @@ void setup() {
 /*=======================================================================================
 // MARK:                                Main loop                                      //
 =======================================================================================*/
+// The animation functions that can be cycled through with the button press are defined here
 
-// How many animations in the loop
-extern const uint8_t numAnimations = 8;
+// How many total animations in the loop?
+extern const uint8_t numAnimations = 10;
 
 void loop() {
     switch (animIndex) {
         //case 0: waveformFade(0); break;
         case 0: glitchLoop(70, 20, 1000); break;
-        case 1: gradientWave(1000); break;
-        case 2: progressiveFade2(700); break;
-        case 3: progressiveFade3(900); break;
-        case 4: randomFade(20, 2000); break;
-        case 5: pulseColor(2500); break;
+        case 1: fakeMorse(65, 210, 400); break;
+        case 2: progressiveFade1(1400); break;
+        case 3: progressiveFade2(1400); break;
+        case 4: randomFade(20, 1000); break;
+        case 5: pulseColor(80); break;
         case 6: bounceBoot(50); break;
-        case 7: holdYourColorPrimary(); break;
+        case 7: photoshootMode1(); break;
+        case 8: photoshootMode2(65, 210); break;
+        case 9: photoshootMode3(); break;
     }
 }
 
@@ -90,53 +91,73 @@ void loop() {
 //                                    End main loop                                    //
 =======================================================================================*/
 
-// MARK: pulseColor -------------------------------------------------------------------------------------------------
+// -------------------------------- Animation Functoins --------------------------------
+// MARK: pulseColor
 // Pulses from primary through to background colors in the active swatch, over <speed> milliseconds
 void pulseColor(const int duration){
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      (duration/2));
+    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      (duration));
     fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,       (duration));
     fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      (duration));
     fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,     (duration));
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      (duration/2));
+    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      (duration));
     fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,       (duration));
     fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      (duration*2));
     fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,     (duration*4));
     fadeToColor(swatch[swNum].background,   swatch[swNum].background,   (duration*6));
 }
 
-// MARK: progressiveFade --------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: progressiveFade
 // Fades through all colors in the active swatch in order, over <duration> milliseconds
-void progressiveFade1(const int duration) {
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,     duration);
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      duration);
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,       duration);
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      duration);
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,       duration);
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      duration);
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,     duration);
-    fadeToColor(swatch[swNum].background,   swatch[swNum].background,   duration);
+void progressiveFade1(const int speed) {
+    unsigned long start = millis();
+    uint8_t outputColor[3];
+    // Fade up over <speed> milliseconds
+    while (millis() - start < speed) {
+        // count up from 0 to 255 over speed milliseconds
+        uint8_t progress = (uint8_t)((millis() - start) * 255 / speed);
+        gradientPosition(progress, outputColor);
+        showColor(outputColor, outputColor, 10);
+    }
+    // Fade down over <speed> milliseconds
+    start = millis(); // Reset start time for fade down
+    while (millis() - start < speed) {
+        // count down from 255 to 0 over speed milliseconds
+        uint8_t progress = (uint8_t)(255 - ((millis() - start) * 255 / speed));
+        gradientPosition(progress, outputColor);
+        showColor(outputColor, outputColor, 10);
+    }
 }
 
-void progressiveFade2(const int duration) {
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].accent,       duration);
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      duration);
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].contrast,     duration);
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].background,   duration);
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].contrast,     duration);
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      duration);
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].accent,       duration);
-    fadeToColor(swatch[swNum].background,   swatch[swNum].primary,      duration);
+void progressiveFade2(const int speed) {
+    unsigned long start = millis();
+    uint8_t outputColor1[3];
+    uint8_t outputColor2[3];
+    // Fade up over <speed> milliseconds
+    while (millis() - start < speed) {
+        // count up from 0 to 255 over speed milliseconds
+        uint8_t progress1 = (uint8_t)((millis() - start) * 255 / speed);
+        // count down from 255 to 0 over speed milliseconds (reverse direction)
+        uint8_t progress2 = (uint8_t)(255 - ((millis() - start) * 255 / speed));
+        gradientPosition(progress1, outputColor1);
+        gradientPosition(progress2, outputColor2);
+        showColor(outputColor1, outputColor2, 10);
+    }
+    // Fade down over <speed> milliseconds
+    start = millis(); // Reset start time for fade down
+    while (millis() - start < speed) {
+        // count up from 0 to 255 over speed milliseconds
+        uint8_t progress1 = (uint8_t)(255 - (millis() - start) * 255 / speed);
+        // count down from 255 to 0 over speed milliseconds (reverse direction)
+        uint8_t progress2 = (uint8_t)(((millis() - start) * 255 / speed));
+        gradientPosition(progress1, outputColor1);
+        gradientPosition(progress2, outputColor2);
+        showColor(outputColor1, outputColor2, 10);
+    }
 }
 
-void progressiveFade3(const int duration) {
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].background,   duration);
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].primary,      duration);
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].accent,       duration);
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].midtone,      duration);
-    fadeToColor(swatch[swNum].background,   swatch[swNum].contrast,     duration);
-}
-
-// MARK: randomFade -------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: randomFade
 // Fades between random colors in the active swatch, each fade for a random speed defined by <min> and <max>
 void randomFade(const int min, const int max) {
     // Get random color indices (0-3) for each LED channel
@@ -169,7 +190,8 @@ void randomFade(const int min, const int max) {
     fadeToColor(firstColor, secondColor, random(min, max));
 }
 
-// MARK: glitchLoop ------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: glitchLoop
 // Advanced neon flicker with 3 different animation patterns selected randomly
 void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const int duration) {
     // For <duration> milliseconds, both LED segments will either play a special animation or the normal flicker
@@ -181,7 +203,7 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             // Apply a special effect
             uint8_t flickerSegment = random(0, numLEDs);
             // Pick a random glitch effect
-            switch (random(0, 5)) {
+            switch (random(0, 6)) {
                 case 0:
                     glitch1(flickerSegment, 700);
                     break;
@@ -196,6 +218,10 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
                     break;
                 case 4:
                     glitch5();
+                    break;
+                case 5:
+                    fakeMorse(65, 210, 400);
+                    break;
             }
             currentTime = millis();
         } else {
@@ -206,7 +232,8 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
     }
 }
 
-// MARK: bounceBoot ----------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: bounceBoot
 void bounceBoot(int speed){
     for (uint8_t reps = 0; reps < 3; reps++) {
         if (reps == 2) speed = speed * 3;
@@ -220,14 +247,28 @@ void bounceBoot(int speed){
     showColor(swatch[swNum].background, swatch[swNum].background, speed*5);
 }
 
-// MARK: holdYourColor ------------------------------------------------------------------------------------------------
-// Shows the accent color only
-void holdYourColorPrimary(){
-    showColor(swatch[swNum].accent, swatch[swNum].accent, 100);
+// -------------------------------------------------------------------------------------
+// MARK: photoshootMode1
+// Shows the primary color only
+void photoshootMode1(){
+    showColor(swatch[swNum].primary, swatch[swNum].primary, 100);
 }
 
-// MARK: --- Animation processor
-// MARK: fadeToColor ------------------------------------------------------------------------------------------------
+// Primary and contrast
+void photoshootMode2(uint8_t color1, uint8_t color2){
+    uint8_t output1[3];
+    uint8_t output2[3];
+    gradientPosition(color1, output1);
+    gradientPosition(color2, output2);
+    showColor(output1, output2, 100);
+}
+
+// Midtone and Accent
+void photoshootMode3(){
+    showColor(swatch[swNum].midtone, swatch[swNum].accent, 100);
+}
+// -------------------------------------------------------------------------------------
+// MARK: fadeToColor
 void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fadeTime){
     uint8_t startColor[2][3];
     uint8_t output[2][3];
@@ -251,7 +292,8 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
     }
 }
 
-// MARK: showColor -----------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: showColor
 void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
     unsigned long startTime = millis();
     while (millis() - startTime < duration) {
@@ -260,7 +302,8 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
     }
 }
 
-// MARK: flicker ---------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: flicker
 void flicker(const uint8_t chance, const uint8_t min, const uint8_t max){
     uint8_t outputColor[3];
     for (uint8_t segment = 0; segment < numLEDs; segment++) {
@@ -270,7 +313,8 @@ void flicker(const uint8_t chance, const uint8_t min, const uint8_t max){
     }
 }
 
-// MARK: glitch1 ------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: glitch1
 void glitch1(const uint8_t segment, int duration){
     uint8_t otherSegment = 0;
     uint8_t flickerTime = 50;
@@ -286,7 +330,8 @@ void glitch1(const uint8_t segment, int duration){
     }
 }
 
-// MARK: glitch2 ------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: glitch2
 void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
     // Part 1: Rapidly flash between black and background for 1 second
     unsigned long flashStartTime = millis();
@@ -304,7 +349,8 @@ void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
     fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      fadeTime);
 }
 
-// MARK: glitch3 ------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: glitch3
 void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     uint8_t startColor[3] = {handoverColor[segment][0], handoverColor[segment][1], handoverColor[segment][2]};
     uint8_t otherSegment = 0;
@@ -321,7 +367,8 @@ void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     }
 }
 
-// MARK: glitch4 ------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: glitch4
 void glitch4(uint8_t reps, int duration) {
     uint8_t color[3];
     unsigned long start = millis();
@@ -336,7 +383,8 @@ void glitch4(uint8_t reps, int duration) {
     }
 }
 
-// MARK: glitch5 ------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: glitch5
 void glitch5(){
     // Use one of the waveform arrays from waveforms.cpp
     uint8_t waveformIndex = random(0, 2); // Choose between the two available waveforms
@@ -372,7 +420,8 @@ void glitch5(){
     fadeToColor(swatch[swNum].contrast, swatch[swNum].background, 300);
 }
 
-// MARK: waveformFade ------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: waveformFade
 void waveformFade(uint8_t index){
     uint8_t outputColor[3];
     for (uint8_t i = 0; i < 32; i++) {
@@ -381,31 +430,34 @@ void waveformFade(uint8_t index){
     }
 }
 
-// MARK: rapidPulse ------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
+// MARK: rapidPulse
 void rapidPulse(uint8_t color1[3], uint8_t color2[3], int speed){
     showColor(color1, color1, speed);
     showColor(color2, color2, speed);
 }
 
-// MARK: gradientWave ------------------------------------------------------------------------------------------
-void gradientWave(int speed){
+// -------------------------------------------------------------------------------------
+// MARK: fakeMorse
+void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
+    uint8_t output1[3];
+    uint8_t output2[3];
+    gradientPosition(color1, output1);
+    gradientPosition(color2, output2);
+    int interval = 50; // Change every 100ms
+
     unsigned long start = millis();
-    uint8_t outputColor[3];
-    // Fade up over <speed> milliseconds
-    while (millis() - start < speed) {
-        // count up from 0 to 255 over speed milliseconds
-        uint8_t progress = (uint8_t)((millis() - start) * 255 / speed);
-        gradientPosition(progress, outputColor);
-        showColor(outputColor, outputColor, 10);
-    }
-    // Fade down over <speed> milliseconds
-    start = millis(); // Reset start time for fade down
-    while (millis() - start < speed) {
-        // count down from 255 to 0 over speed milliseconds
-        uint8_t progress = (uint8_t)(255 - ((millis() - start) * 255 / speed));
-        gradientPosition(progress, outputColor);
-        showColor(outputColor, outputColor, 10);
+    while (millis() - start < duration) {
+        int selection = random(0, 3);
+        // Set LED colors based on selection
+        if (selection == 0) {
+            showColor(output1, output2, interval);
+        } else if (selection == 1) {
+            // Second segment gets color2, first gets color1
+            showColor(output2, output1, interval);
+        } else {
+            // Neither selected, both get color1
+            showColor(output1, output1, interval);
+        }
     }
 }
-
-// ------------------------------------------------------------------------------------------------------------------

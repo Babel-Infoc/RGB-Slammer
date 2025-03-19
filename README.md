@@ -34,7 +34,7 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
 - ### Preconfigured animations
     Included is a number of preconfigured animation elements and longer animation cycles, which are easily configured using main loop arguments
 - ### Max output brightness
-    `maxBrightness` float that can be configured between 0 and 1
+    `maxBrightness` output modifier, configure between 0 and 255
 - ### Ambient brightness
     (feature in progress)
     `ambientBrightness` float that can be modified by a light sensor if you have one
