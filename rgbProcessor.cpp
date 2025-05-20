@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include "types.h"
 #include "swatches.h"
+#include "flashStorage.h"
 
 // Initialize the buttons
 uint8_t colorButtonLastState = HIGH;
 uint8_t animButtonLastState = HIGH;
-uint8_t animIndex = 0;
 uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
@@ -68,6 +68,9 @@ void checkButtons() {
         if (colorButtonState != colorButtonLastState) {
             if (colorButtonState == LOW) {
                 swNum = (swNum + 1) % numSwatches;
+
+                // Save the new swatch number to flash
+                saveSettingsToFlash(swNum, animIndex);
             }
             colorButtonLastState = colorButtonState;
         }
@@ -79,6 +82,9 @@ void checkButtons() {
                 animIndex = (animIndex + 1) % numAnimations;
                 // Set the interrupt flag to break current animation
                 animInterrupt = true;
+
+                // Save the new animation index to flash
+                saveSettingsToFlash(swNum, animIndex);
             }
             animButtonLastState = animButtonState;
         }

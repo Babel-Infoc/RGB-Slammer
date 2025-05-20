@@ -3,45 +3,56 @@ RGB Slammer
 Written by Tully Jagoe 2025
 MIT License
 
-This script is best edited in VSCode, using the following extension:
-https://marketplace.visualstudio.com/items?itemName=yechunan.json-color-token
+This script is best edited in VSCode for color token selection in swatches.cpp
 */
 
 #include <Arduino.h>
 #include "types.h"
 #include "swatches.h"
 #include "waveforms.h"
-
-// Define numLEDs here instead of in types.h to avoid multiple definitions
+#include "flashStorage.h"
+#include "pinouts.h"
+// Number of LED segments
 const uint8_t numLEDs = 2;
 
-// The `led` array contains the pin configurations for different LEDs.
-// Each element in the array represents a different LED with its associated pins.
-ledSegment led[2] = {
-    {PD5, PD3, PD4},
-    {PC5, PC6, PC4}
-};
+// Select which hardware configuration to use
+// Options: CONFIG_BLINDER_MINI, CONFIG_AG_ECHO_FRAME
+ConfigType activeConfig = CONFIG_AG_ECHO_FRAME;
 
-// Define the pins for the animation and color select buttons
-const uint8_t colorBtn = PD6;
-const uint8_t animBtn = PD2;
+// Define the LED array and button pins according to the active configuration
+ledSegment led[2];
+uint8_t colorBtn;
+uint8_t animBtn;
+
+// Animation index - current animation being played
+uint8_t animIndex = 0;
 
 // Maximum brightness modifier, 0-255
-const float maxBrightness = 0.7;
+const float maxBrightness = 0.4;
 
 // Slow down all animations by this amount (in milliseconds)
-const uint8_t slowDown = 1;
+const uint8_t slowDown = 0;
 
-// Luminosity modifiers
+// LED Color tuning
 // Define the light intensity of each LED color at the specified mA value
-// Check your LEDs datasheet for typical luminosity values at different currents
-const luminance red       = {8, 52};
-const luminance green     = {5, 163};
-const luminance blue      = {3, 18};
+// Check your LEDs datasheet for typical luminosity values for standard forward current
+// {mA, luminosity}
+const luminance red       = {20, 630};
+const luminance green     = {20, 530};
+const luminance blue      = {20, 475};
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
 void setup() {
+    // Get the active configuration using the case-based approach
+    const PinConfig& config = getActiveConfig(activeConfig);
+
+    // Copy pin configuration from the selected hardware profile
+    led[0] = config.leds[0];
+    led[1] = config.leds[1];
+    colorBtn = config.colorButton;
+    animBtn = config.animButton;
+
     // Set up all LED segments
     for (uint8_t segment = 0; segment < 2; segment++) {
         pinMode(led[segment].red, OUTPUT);
@@ -59,8 +70,16 @@ void setup() {
     float randSeed1(analogRead(0));
     float randSeed2(analogRead(1));
 
+
+    // Try to load saved settings from flash
+    if (!loadSettingsFromFlash(&swNum, &animIndex)) {
+        // If no valid settings found, use defaults (which are already set in declarations)
+        swNum = 0;
+        animIndex = 0;
+    }
+
     // Show the bootup animation
-    bounceBoot(50);
+    bounceBoot(40);
 }
 
 /*=======================================================================================
@@ -69,21 +88,20 @@ void setup() {
 // The animation functions that can be cycled through with the button press are defined here
 
 // How many total animations in the loop?
-extern const uint8_t numAnimations = 10;
+extern const uint8_t numAnimations = 9;
 
 void loop() {
     switch (animIndex) {
         //case 0: waveformFade(0); break;
         case 0: glitchLoop(70, 20, 1000); break;
-        case 1: fakeMorse(65, 210, 400); break;
-        case 2: progressiveFade1(1400); break;
-        case 3: progressiveFade2(1400); break;
-        case 4: randomFade(20, 1000); break;
-        case 5: pulseColor(80); break;
-        case 6: bounceBoot(50); break;
-        case 7: photoshootMode1(); break;
-        case 8: photoshootMode2(65, 210); break;
-        case 9: photoshootMode3(); break;
+        case 1: progressiveFade1(1400); break;
+        case 2: progressiveFade2(1400); break;
+        case 3: randomFade(20, 1000); break;
+        case 4: pulseColor(30); break;
+        case 5: pulse2(40); break;
+        case 6: photoshootMode1(); break;
+        case 7: photoshootMode2(65, 210); break;
+        case 8: photoshootMode3(); break;
     }
 }
 
@@ -226,15 +244,16 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             currentTime = millis();
         } else {
             // Normal flicker on both segments
-            flicker(flickerChance, 50, 150);
+            flicker(0, flickerChance, 150, 200);
+            flicker(1, flickerChance, 50, 150);
             currentTime = millis();
         }
     }
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: bounceBoot
-void bounceBoot(int speed){
+// MARK: pulse2
+void pulse2(int speed){
     for (uint8_t reps = 0; reps < 3; reps++) {
         if (reps == 2) speed = speed * 3;
         fadeToColor(swatch[swNum].primary,      swatch[swNum].background,   speed);
@@ -245,6 +264,21 @@ void bounceBoot(int speed){
         fadeToColor(swatch[swNum].background,   swatch[swNum].background,   speed);
     }
     showColor(swatch[swNum].background, swatch[swNum].background, speed*5);
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: bounceBoot
+void bounceBoot(int speed){
+    for (uint8_t reps = 0; reps < 3; reps++) {
+        if (reps == 2) speed = speed * 3;
+        fadeToColor(swatch[0].primary,      swatch[0].background,   speed);
+        fadeToColor(swatch[0].accent,       swatch[0].primary,      speed);
+        fadeToColor(swatch[0].midtone,      swatch[0].accent,       speed);
+        fadeToColor(swatch[0].contrast,     swatch[0].midtone,      speed);
+        fadeToColor(swatch[0].background,   swatch[0].contrast,     speed);
+        fadeToColor(swatch[0].background,   swatch[0].background,   speed);
+    }
+    showColor(swatch[0].background, swatch[0].background, speed*5);
 }
 
 // -------------------------------------------------------------------------------------
@@ -267,6 +301,7 @@ void photoshootMode2(uint8_t color1, uint8_t color2){
 void photoshootMode3(){
     showColor(swatch[swNum].midtone, swatch[swNum].accent, 100);
 }
+
 // -------------------------------------------------------------------------------------
 // MARK: fadeToColor
 void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fadeTime){
@@ -304,13 +339,11 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
 
 // -------------------------------------------------------------------------------------
 // MARK: flicker
-void flicker(const uint8_t chance, const uint8_t min, const uint8_t max){
+void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const uint8_t max){
     uint8_t outputColor[3];
-    for (uint8_t segment = 0; segment < numLEDs; segment++) {
-        uint8_t range = random(min, max);
-        gradientPosition(range, outputColor);
-        sendToRGB(segment, outputColor);
-    }
+    uint8_t range = random(min, max);
+    gradientPosition(range, outputColor);
+    sendToRGB(pin, outputColor);
 }
 
 // -------------------------------------------------------------------------------------

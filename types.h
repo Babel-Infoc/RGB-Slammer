@@ -14,8 +14,8 @@ struct ledSegment {
 extern ledSegment led[];
 
 // Pin definitions
-extern const uint8_t colorBtn;
-extern const uint8_t animBtn;
+extern uint8_t colorBtn;
+extern uint8_t animBtn;
 extern const uint8_t numLEDs;
 
 // LED luminance information
