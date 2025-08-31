@@ -17,7 +17,7 @@ const uint8_t numLEDs = 2;
 
 // Select which hardware configuration to use
 // Options: CONFIG_BLINDER_MINI, CONFIG_AG_ECHO_FRAME
-ConfigType activeConfig = CONFIG_AG_ECHO_FRAME;
+ConfigType activeConfig = CONFIG_BLINDER_MINI;
 
 // Define the LED array and button pins according to the active configuration
 ledSegment led[2];
@@ -28,7 +28,7 @@ uint8_t animBtn;
 uint8_t animIndex = 0;
 
 // Maximum brightness modifier, 0-255
-const float maxBrightness = 0.4;
+const float maxBrightness = 0.72;
 
 // Slow down all animations by this amount (in milliseconds)
 const uint8_t slowDown = 0;
@@ -88,20 +88,21 @@ void setup() {
 // The animation functions that can be cycled through with the button press are defined here
 
 // How many total animations in the loop?
-extern const uint8_t numAnimations = 9;
+extern const uint8_t numAnimations = 1;
 
 void loop() {
     switch (animIndex) {
         //case 0: waveformFade(0); break;
-        case 0: glitchLoop(70, 20, 1000); break;
-        case 1: progressiveFade1(1400); break;
-        case 2: progressiveFade2(1400); break;
-        case 3: randomFade(20, 1000); break;
-        case 4: pulseColor(30); break;
-        case 5: pulse2(40); break;
-        case 6: photoshootMode1(); break;
-        case 7: photoshootMode2(65, 210); break;
-        case 8: photoshootMode3(); break;
+        //case 0: glitchLoop(70, 20, 1000); break;
+        //case 1: progressiveFade1(1400); break;
+        //case 2: progressiveFade2(1400); break;
+        //case 3: randomFade(20, 1000); break;
+        //case 4: pulseColor(30); break;
+        //case 5: pulse2(40); break;
+        //case 6: photoshootMode1(); break;
+        //case 7: photoshootMode2(65, 210); break;
+        //case 8: photoshootMode3(); break;
+        case 0: digitalEyes(70, 25, 3000); break;
     }
 }
 
@@ -300,6 +301,45 @@ void photoshootMode2(uint8_t color1, uint8_t color2){
 // Midtone and Accent
 void photoshootMode3(){
     showColor(swatch[swNum].midtone, swatch[swNum].accent, 100);
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: digitalEyes
+// Digital eyes with different expressions and eye movements
+void digitalEyes(const uint8_t baseFlickerChance, const uint8_t expressionChance, const int duration) {
+
+    unsigned long currentTime = millis();
+    unsigned long startTime = millis();
+
+
+    // Run for the specified duration
+    while (millis() - startTime < duration) {
+        currentTime = millis();
+
+        // Normal flicker on both segments
+        flicker(0, 20, 150, 255);
+        flicker(1, 20, 150, 255);
+        currentTime = millis();
+
+        // Random blinks
+        if (random(0, 1000) < 15) {
+            showColor(swatch[swNum].background, swatch[swNum].background,50);
+        }
+        if (random(0, 1000) < 2) {
+            eyeFlare();
+        }
+
+        delay(10);
+    }
+}
+
+// Helper function for alert eyes
+void eyeFlare() {
+    showColor(swatch[swNum].primary, swatch[swNum].primary,50);
+    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,50);
+    fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,50);
+    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,50);
+    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,50);
 }
 
 // -------------------------------------------------------------------------------------

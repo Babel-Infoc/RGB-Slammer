@@ -3,6 +3,7 @@
 
 // Define macro to convert rgb(r, g, b) to {r, g, b}
 #define rgb(r, g, b) {r, g, b}
+#define rgba(r, g, b, a) {r, g, b}
 
 // Initialise the swatch array index
 uint8_t swNum = 0;
@@ -16,22 +17,30 @@ uint8_t swNum = 0;
 */
 // Master array of swatches
 swatchArray swatch[] = {
-    {   // Heat treated
-        rgb(255,    196,    0),
-        rgb(255, 38, 0),
-        rgb(149,    0,      255),
-        rgb(55, 0, 255),
-        rgb(0,      0,      0),
-    },
     {
         // Hazard pay
-        rgb(255, 145, 0),
-        rgb(255, 72, 0),
-        rgb(255, 0, 162),
+        rgb(255, 171, 93),
+        rgb(255, 30, 0),
+        rgb(255, 30, 0),
         rgb(100,    0,      0),
-        rgb(50,    0,      0),
+        rgb(0, 0, 0),
     },
     {
+        // VHS pink
+        rgba(255, 208, 243, 1),
+        rgba(255, 166, 240, 1),
+        rgba(105, 8, 143, 1),
+        rgba(24, 7, 85, 1),
+        rgb(0, 0, 0),
+    },
+    {   // Orange
+        rgba(255, 187, 132, 1),
+        rgb(255, 150, 64),
+        rgba(255, 115, 0, 1),
+        rgba(148, 67, 0, 1),
+        rgba(0, 0, 0, 1),
+    },
+    /*{
         // Green
         rgb(238, 255, 0),
         rgb(115, 255, 0),
@@ -109,7 +118,7 @@ swatchArray swatch[] = {
         rgb(65, 122, 255),
         rgb(130, 130, 130),
         rgb(20,     20,     20),
-    },
+    },*/
 };
 
 // Calculate the number of swatches automatically based on array size
