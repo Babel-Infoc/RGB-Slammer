@@ -12,15 +12,20 @@ uint8_t debounceStart = 0;
 // Swatch preview animation flag
 bool swatchPreviewActive = false;
 
+// Brightness adjustment mode variables
+unsigned long buttonPressStartTime = 0;
+bool buttonHeldFor2Seconds = false;
+
 // Replace std::array with plain C arrays to save significant flash memory
 float tuneRatio[3] = {1.0, 1.0, 1.0};
 uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
 
 // Reference to the led array defined in the main sketch
 extern ledSegment led[2];
+extern float currentBrightness;
 
 // MARK: Gamma Correction ------------------------------
-const uint8_t gamma8[] = {
+const uint8_t PROGMEM gamma8[] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,
@@ -42,18 +47,19 @@ const uint8_t gamma8[] = {
 // MARK: Luminance Calculation ------------------------------
 // Function to calculate luminance ratios for consistent color output
 void calculateLuminance() {
-    float rRatio, gRatio, bRatio;
-    float maxLum = max(max(red.luminance, green.luminance), blue.luminance);
-    rRatio    = (red.luminance / maxLum) / red.mA;
-    gRatio    = (green.luminance / maxLum) / green.mA;
-    bRatio    = (blue.luminance / maxLum) / blue.mA;
-    float tuneRatio[] = {rRatio, gRatio, bRatio};
+    // Calculate the effective luminance per mA for each LED
+    float rEfficiency = red.luminance / red.mA;
+    float gEfficiency = green.luminance / green.mA;
+    float bEfficiency = blue.luminance / blue.mA;
 
-    // Get the highest Ratio value, adjust it up to 1, and adjust the other two ratios up at the same rate
-    float maxRatio = max(rRatio, max(gRatio, bRatio));
-    tuneRatio[0] = maxRatio / rRatio;
-    tuneRatio[1] = maxRatio / gRatio;
-    tuneRatio[2] = maxRatio / bRatio;
+    // Find the most efficient LED (highest luminance per mA)
+    float maxEfficiency = max(rEfficiency, max(gEfficiency, bEfficiency));
+
+    // Scale all LEDs DOWN from the most efficient one
+    // This ensures no LED is driven above its baseline
+    tuneRatio[0] = rEfficiency / maxEfficiency; // Red ratio (≤ 1.0)
+    tuneRatio[1] = gEfficiency / maxEfficiency; // Green ratio (≤ 1.0)
+    tuneRatio[2] = bEfficiency / maxEfficiency; // Blue ratio (≤ 1.0)
 }
 
 // MARK: Button Handling ------------------------------
@@ -63,21 +69,38 @@ void checkButtons() {
     } else {
         // Check color button
         uint8_t colorButtonState = digitalRead(colorBtn);
+
         if (colorButtonState != colorButtonLastState) {
             if (colorButtonState == LOW) {
-                swNum = (swNum + 1) % numSwatches;
-
-                // Save the new swatch number to flash
-                saveSettingsToFlash(swNum);
-
-                // Trigger swatch preview animation
-                swatchPreviewActive = true;
+                // Button just pressed - start timing
+                buttonPressStartTime = millis();
+                buttonHeldFor2Seconds = false;
+            } else {
+                // Button just released
+                if (!buttonHeldFor2Seconds) {
+                    // Short press - change swatch
+                    swNum = (swNum + 1) % numSwatches;
+                    saveSettingsToFlash(swNum, currentBrightness);
+                    swatchPreviewActive = true;
+                } else {
+                    // Long press was released - exit brightness mode and save brightness
+                    brightnessAdjustMode = false;
+                    // Save both swatch and current brightness to flash
+                    saveSettingsToFlash(swNum, currentBrightness);
+                }
+                buttonHeldFor2Seconds = false;
             }
             colorButtonLastState = colorButtonState;
+        } else if (colorButtonState == LOW && !buttonHeldFor2Seconds) {
+            // Button is being held - check if trigger time has passed
+            if (millis() - buttonPressStartTime >= brightnessModeTriggerTime) {
+                buttonHeldFor2Seconds = true;
+                brightnessAdjustMode = true;
+            }
         }
 
         // Restart the debounce timer
-        debounceStart = 300;
+        debounceStart = 10; // Reduced for more responsive long press detection
     }
 }
 
@@ -96,7 +119,11 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // Calculate the brightness-adjusted and gamma-corrected values using global tuneRatio
     for (uint8_t pin = 0; pin < 3; pin++) {
-        tunedRGB[pin] = gamma8[(int)(rgbValue[pin] * tuneRatio[pin] * maxBrightness)];
+        // Calculate the final RGB value with bounds checking to prevent overflow
+        float adjustedValue = rgbValue[pin] * tuneRatio[pin] * currentBrightness;
+        // Constrain to valid gamma table range (0-255)
+        int constrainedValue = constrain((int)adjustedValue, 0, 255);
+        tunedRGB[pin] = pgm_read_byte(&gamma8[constrainedValue]);
     }
 
     // Set the pin states based on the tuned RGB values

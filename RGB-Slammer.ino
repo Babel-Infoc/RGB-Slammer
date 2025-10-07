@@ -23,10 +23,16 @@ ConfigType activeConfig = CONFIG_BLINDER_MINI;
 ledSegment led[2];
 uint8_t colorBtn;
 
-// Maximum brightness modifier, 0-255
-float maxBrightness = 0.3;
+// Set the default brightness modifier, 0.0 to 0.65 max
+float currentBrightness = 0.4;
 // Temporary brightness value to be used when previewing the new swatch after changing it
-float pulseBrightness = 0.65;
+float pulseBrightness = 0.85;
+
+// Brightness adjustment settings
+const float minBrightness = 0.3;
+const float maxBrightness = 0.5;
+const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
+bool brightnessAdjustMode = false;
 
 // Slow down all animations by this amou nt (in milliseconds)
 const uint8_t slowDown = 0;
@@ -37,7 +43,7 @@ const uint8_t slowDown = 0;
 // {mA, luminosity}
 const luminance red       = {5, 45};
 const luminance green     = {5, 45};
-const luminance blue      = {5, 35};
+const luminance blue      = {5, 45};
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
@@ -68,9 +74,10 @@ void setup() {
 
 
     // Try to load saved settings from flash
-    if (!loadSettingsFromFlash(&swNum)) {
+    if (!loadSettingsFromFlash(&swNum, &currentBrightness)) {
         // If no valid settings found, use defaults (which are already set in declarations)
         swNum = 0;
+        currentBrightness = 0.3; // Default brightness
     }
 
     // Show the bootup animation
@@ -83,8 +90,12 @@ void setup() {
 // Only runs the glitchLoop animation
 
 void loop() {
+    // Check if brightness adjustment mode should be active
+    if (brightnessAdjustMode) {
+        brightnessAdjustmentMode();
+    }
     // Check if swatch preview animation should play
-    if (swatchPreviewActive) {
+    else if (swatchPreviewActive) {
         swatchPreview();
     } else {
         glitchLoop(70, 20, 1000);
@@ -392,8 +403,9 @@ void swatchPreview() {
     const int stepDuration = totalDuration / steps;
 
     // Store original brightness and temporarily increase it
-    float originalBrightness = maxBrightness;
-    maxBrightness = pulseBrightness;
+    float originalBrightness = currentBrightness;
+    // Constrain pulse brightness to prevent overflow
+    currentBrightness = constrain(pulseBrightness, 0.0, maxBrightness);
 
     unsigned long startTime = millis();
 
@@ -415,8 +427,42 @@ void swatchPreview() {
     }
 
     // Restore original brightness
-    maxBrightness = originalBrightness;
+    currentBrightness = originalBrightness;
 
     // Reset the flag
     swatchPreviewActive = false;
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: brightnessAdjustmentMode
+void brightnessAdjustmentMode() {
+    const int cycleDuration = 4000; // 4 seconds total
+    const int stepDuration = 100; // Update every 100ms
+
+    unsigned long modeStartTime = millis();
+
+    // Use white color for brightness display
+    uint8_t whiteColor[3] = {255, 255, 255};
+
+    while (brightnessAdjustMode && digitalRead(colorBtn) == LOW) {
+        unsigned long elapsedTime = millis() - modeStartTime;
+
+        // Simple triangle wave for brightness cycling
+        float cyclePos = (float)(elapsedTime % cycleDuration) / cycleDuration;
+        float brightnessRatio = (cyclePos < 0.5) ? cyclePos * 2 : 2 - (cyclePos * 2);
+
+        // Map to brightness range
+        currentBrightness = minBrightness + (maxBrightness - minBrightness) * brightnessRatio;
+
+        // Display white at current brightness on both segments
+        // Use direct LED control to avoid button checking interference
+        for (int i = 0; i < 10; i++) { // Display multiple times per step for stability
+            sendToRGB(0, whiteColor);
+            sendToRGB(1, whiteColor);
+            delay(stepDuration / 10);
+        }
+    }
+
+    // Reset mode flag
+    brightnessAdjustMode = false;
 }

@@ -24,7 +24,7 @@ uint8_t calculateChecksum(const FlashSettings* settings) {
 }
 
 // Load settings from flash memory
-bool loadSettingsFromFlash(uint8_t* swatchNum) {
+bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness) {
     // Point to the flash memory where settings are stored
     const FlashSettings* storedSettings = (const FlashSettings*)FLASH_SETTINGS_PAGE_ADDR;
 
@@ -36,6 +36,8 @@ bool loadSettingsFromFlash(uint8_t* swatchNum) {
             if (storedSettings->swatchNumber < numSwatches) {
                 // Settings are valid, load them
                 *swatchNum = storedSettings->swatchNumber;
+                // Convert brightness from 0-255 scale back to 0.0-1.0 scale
+                *brightness = (float)storedSettings->brightness / 255.0f;
                 return true;
             }
         }
@@ -46,9 +48,9 @@ bool loadSettingsFromFlash(uint8_t* swatchNum) {
 }
 
 // Save settings to flash memory
-bool saveSettingsToFlash(uint8_t swatchNum) {
+bool saveSettingsToFlash(uint8_t swatchNum, float brightness) {
     // Don't attempt to save if values are out of expected range
-    if (swatchNum >= numSwatches) {
+    if (swatchNum >= numSwatches || brightness < 0.0f || brightness > 1.0f) {
         return false;
     }
 
@@ -56,8 +58,9 @@ bool saveSettingsToFlash(uint8_t swatchNum) {
     FlashSettings newSettings;
     newSettings.signature = SETTINGS_SIGNATURE;
     newSettings.swatchNumber = swatchNum;
-    newSettings.padding[0] = 0;  // Clear padding
-    newSettings.padding[1] = 0;  // Clear padding
+    // Convert brightness from 0.0-1.0 scale to 0-255 scale for storage
+    newSettings.brightness = (uint8_t)(brightness * 255.0f);
+    newSettings.padding = 0;  // Clear padding
     newSettings.checksum = calculateChecksum(&newSettings);
 
     // Unlock flash for writing
@@ -96,6 +99,7 @@ bool saveSettingsToFlash(uint8_t swatchNum) {
     // Verify the written data
     const FlashSettings* storedSettings = (const FlashSettings*)FLASH_SETTINGS_PAGE_ADDR;
     if (storedSettings->swatchNumber == swatchNum &&
+        storedSettings->brightness == (uint8_t)(brightness * 255.0f) &&
         storedSettings->signature == SETTINGS_SIGNATURE &&
         storedSettings->checksum == calculateChecksum(storedSettings)) {
         return true;

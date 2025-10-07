@@ -18,32 +18,18 @@ uint8_t swNum = 0;
 // Master array of swatches
 swatchArray swatch[] = {
     {
+        // Hazard pay
+        rgba(255,   200,    0,      1),
+        rgba(255,   150,    0,      1),
+        rgba(200,   100,    0,      1),
+        rgba(100,   50,     0,      1),
+        rgba(50,    0,      0,      1),
+    },{
         // White and Red
         rgba(255,   200,    200,    1),
         rgba(255,   0,      150,     1),
         rgba(200,   0,      100,     1),
         rgba(150,   0,      50,     1),
-        rgba(0,     0,      0,      1),
-    },{
-        // Hazard pay
-        rgba(255,   200,    0,      1),
-        rgba(255,   150,    0,      1),
-        rgba(200,   100,     0,      1),
-        rgba(100,   50,     0,      1),
-        rgba(50,    0,      0,      1),
-    },{
-        // Mono red
-        rgba(255,   255,   255,    1),
-        rgba(250,   200,   200,    1),
-        rgba(200,   150,   150,    1),
-        rgba(150,   100,   100,    1),
-        rgba(100,   50,    50,     1),
-    },{
-        // White and Green
-        rgba(200,   255,    200,    1),
-        rgba(150,   255,    0,      1),
-        rgba(100,    200,    0,      1),
-        rgba(50,    150,    0,      1),
         rgba(0,     0,      0,      1),
     },{
         // Acid spill
@@ -53,18 +39,11 @@ swatchArray swatch[] = {
         rgba(0,     100,    50,     1),
         rgba(0,     0,      0,      1),
     },{
-        // Mono green
-        rgba(255,   255,    255,    1),
-        rgba(200,   250,    200,    1),
-        rgba(150,   200,    150,    1),
-        rgba(100,   150,    100,    1),
-        rgba(50,    100,    50,     1),
-    },{
-        // White and Blue
-        rgba(200,   200,    255,    1),
-        rgba(0,     150,    255,    1),
-        rgba(0,     100,    200,    1),
-        rgba(0,     50,     150,    1),
+        // White and Green
+        rgba(200,   255,    200,    1),
+        rgba(150,   255,    0,      1),
+        rgba(100,   200,    0,      1),
+        rgba(50,    150,    0,      1),
         rgba(0,     0,      0,      1),
     },{
         // Static romance
@@ -74,12 +53,12 @@ swatchArray swatch[] = {
         rgba(50,    0,      100,    1),
         rgba(0,     0,      0,      1),
     },{
-        // Mono blue
-        rgba(255,   255,    255,    1),
-        rgba(200,   200,    250,    1),
-        rgba(150,   150,    200,    1),
-        rgba(100,   100,    150,    1),
-        rgba(50,    50,     100,     1),
+        // White and Blue
+        rgba(200,   200,    255,    1),
+        rgba(0,     150,    255,    1),
+        rgba(0,     100,    200,    1),
+        rgba(0,     50,     150,    1),
+        rgba(0,     0,      0,      1),
     },{
         // Villa Straylight
         rgba(50,    200,    255,    1),
@@ -93,7 +72,7 @@ swatchArray swatch[] = {
         rgba(255,   255,    0,      1),
         rgba(200,   250,    0,      1),
         rgba(120,   100,    0,      1),
-        rgba(100,   50,     0,     1),
+        rgba(100,   50,     0,      1),
     },{
         // Brandi
         rgba(255,   0,      255,    1),
@@ -102,47 +81,12 @@ swatchArray swatch[] = {
         rgba(100,   0,      100,    1),
         rgba(50,    0,      50,     1),
     },{
-        // Mono purple
-        rgba(255,   255,    255,    1),
-        rgba(250,   200,    250,    1),
-        rgba(200,   150,    200,    1),
-        rgba(150,   100,    150,    1),
-        rgba(100,    50,    100,    1),
-    },{
         // Wintermute
         rgba(0,   255,      255,    1),
         rgba(0,   200,      200,    1),
         rgba(0,   150,      150,    1),
         rgba(0,   100,      100,    1),
         rgba(0,    50,      50,     1),
-    },{
-        // Mono teal
-        rgba(255,   255,    255,    1),
-        rgba(200,   250,    250,    1),
-        rgba(150,   200,    200,    1),
-        rgba(100,   150,    150,    1),
-        rgba(50,    100,    100,    1),
-    },{
-        // Venom escort
-        rgba(255,   50,     255,    1),
-        rgba(200,   100,    200,    1),
-        rgba(150,   150,    150,    1),
-        rgba(100,   200,    100,    1),
-        rgba(50,    255,    50,     1),
-    },{
-        // Chemical spill
-        rgba(200,   255,    0,      1),
-        rgba(150,   255,    0,      1),
-        rgba(150,   200,    150,    1),
-        rgba(100,   100,    150,    1),
-        rgba(100,   0,      100,    1),
-    },{
-        // Strawbs
-        rgba(212,   255,    0,      1),
-        rgba(109,   192,    0,      1),
-        rgba(180,   0,      141,    1),
-        rgba(136,   0,      52,     1),
-        rgba(87,    0,      33,     1),
     },{
         // Classic synthwave
         rgba(255,   0,      200,    1),
@@ -151,27 +95,6 @@ swatchArray swatch[] = {
         rgba(50,    0,      200,    1),
         rgba(100,   0,      50,     1),
     },{
-        // Slasher
-        rgba(255,   0,      50,     1),
-        rgba(100,   0,      100,    1),
-        rgba(50,    0,      255,    1),
-        rgba(50,    0,      50,     1),
-        rgba(100,   0,      100,    1),
-    },{
-        // Hallows eve
-        rgba(255,   100,    0, 1),
-        rgba(150, 50, 0, 1),
-        rgba(200,   0,    255,    1),
-        rgba(50, 255, 0, 1),
-        rgba(50,    0,      100,      1),
-    },{
-        // Propaganda
-        rgba(255,   255,    50,     1),
-        rgba(100,   100,    200,    1),
-        rgba(20, 20, 100, 1),
-        rgba(255, 255, 50, 1),
-        rgba(50,    50,     255,    1),
-    },{
         // Heat treated
         rgba(255,   220,    106,    1),
         rgba(209,   0,      52,     1),
@@ -179,19 +102,12 @@ swatchArray swatch[] = {
         rgba(0,     0,      97,     1),
         rgba(0,     0,      0,      1)
     },{
-        // Rage
-        rgba(255,   255,    255,    1),
-        rgba(200,   200,    250,    1),
-        rgba(150,   150,    200,    1),
-        rgba(150,   20,    20,    1),
-        rgba(100,   0,      0,      1),
-    },{
-        // Mono purple
+        // Villa Straylight
         rgba(255,   255,    255,    1),
         rgba(200,   200,    200,    1),
         rgba(150,   150,    150,    1),
         rgba(100,   100,    100,    1),
-        rgba( 50,    50,     50,    1),
+        rgba(10,    10,     10,    1),
     }
 };
 
