@@ -24,7 +24,9 @@ ledSegment led[2];
 uint8_t colorBtn;
 
 // Maximum brightness modifier, 0-255
-const float maxBrightness = 0.3;
+float maxBrightness = 0.3;
+// Temporary brightness value to be used when previewing the new swatch after changing it
+float pulseBrightness = 0.65;
 
 // Slow down all animations by this amou nt (in milliseconds)
 const uint8_t slowDown = 0;
@@ -81,7 +83,12 @@ void setup() {
 // Only runs the glitchLoop animation
 
 void loop() {
-    glitchLoop(70, 20, 1000);
+    // Check if swatch preview animation should play
+    if (swatchPreviewActive) {
+        swatchPreview();
+    } else {
+        glitchLoop(70, 20, 1000);
+    }
 }
 
 /*=======================================================================================
@@ -112,6 +119,11 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
     unsigned long currentTime = millis();
     bool effectTrigger = random(0, 100) < effectChance;
     while (currentTime - startTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         if (effectTrigger) {
             // Apply a special effect
             uint8_t flickerSegment = random(0, numLEDs);
@@ -139,7 +151,7 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             currentTime = millis();
         } else {
             // Normal flicker on both segments
-            flicker(0, flickerChance, 100, 255);
+            flicker(0, flickerChance, 20, 255);
             flicker(1, flickerChance, 150, 200);
             currentTime = millis();
         }
@@ -161,6 +173,11 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 
     unsigned long startTime = millis();
     while (millis() - startTime < fadeTime) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         float fadeRatio = (float)(millis() - startTime) / fadeTime;
             for (int pin = 0; pin < 3; pin++) {
                 output[0][pin] = startColor[0][pin] + (color1[pin] - startColor[0][pin]) * fadeRatio;
@@ -176,6 +193,10 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
     unsigned long startTime = millis();
     while (millis() - startTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
         sendToRGB(0, color1);
         sendToRGB(1, color2);
     }
@@ -197,6 +218,11 @@ void glitch1(const uint8_t segment, int duration){
     uint8_t flickerTime = 50;
     unsigned long flashStartTime = millis();
     while (millis() - flashStartTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         if (segment == 0) {
             showColor(swatch[swNum].contrast, swatch[swNum].accent,50);
             showColor(swatch[swNum].contrast, swatch[swNum].background,50);
@@ -213,6 +239,10 @@ void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
     // Part 1: Rapidly flash between black and background for 1 second
     unsigned long flashStartTime = millis();
     while (millis() - flashStartTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
         rapidPulse(color1, color2, 50);
     }
 
@@ -234,6 +264,11 @@ void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     if (segment == 0) {otherSegment = 1;}
     // Hold otherSegment at its handoverColor, and flash segment between startColor and color2 twice
     for (int reps = 0; reps < 3; reps++) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         if (segment == 0) {
             showColor(startColor, handoverColor[1], duration);
             showColor(color2, handoverColor[1], duration);
@@ -250,6 +285,11 @@ void glitch4(uint8_t reps, int duration) {
     uint8_t color[3];
     unsigned long start = millis();
     while (millis() - start < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         for (uint8_t segment = 0; segment < numLEDs; segment++) {
             gradientPosition(random(1, 255), color);
             for (uint8_t i = 0; i < reps; i++) {
@@ -269,6 +309,11 @@ void glitch5(){
 
     // First play through the waveform once
     for (uint8_t i = 0; i < 32; i++) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         // Get color at this position in the gradient
         gradientPosition(waveform[waveformIndex].waveform[i], outputColor);
 
@@ -284,6 +329,11 @@ void glitch5(){
 
     // Then do some rapid random jumps between waveform positions
     for (uint8_t i = 0; i < 8; i++) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         uint8_t randomPos = random(0, 32);
         gradientPosition(waveform[waveformIndex].waveform[randomPos], outputColor);
         showColor(outputColor, outputColor, 30);
@@ -315,6 +365,11 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
 
     unsigned long start = millis();
     while (millis() - start < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         int selection = random(0, 3);
         // Set LED colors based on selection
         if (selection == 0) {
@@ -327,4 +382,41 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
             showColor(output1, output1, interval);
         }
     }
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: swatchPreview
+void swatchPreview() {
+    const int totalDuration = 500; // 0.5 seconds
+    const int steps = 50; // Number of animation steps
+    const int stepDuration = totalDuration / steps;
+
+    // Store original brightness and temporarily increase it
+    float originalBrightness = maxBrightness;
+    maxBrightness = pulseBrightness;
+
+    unsigned long startTime = millis();
+
+    // Animate through the full gradient from background (255) to primary (0)
+    for (int i = 0; i < steps; i++) {
+        // Calculate gradient position (255 = background, 0 = primary)
+        uint8_t gradientPos = 255 - ((i * 255) / (steps - 1));
+        uint8_t outputColor[3];
+
+        // Get the color at this gradient position
+        gradientPosition(gradientPos, outputColor);
+
+        // Apply to both LED segments
+        sendToRGB(0, outputColor);
+        sendToRGB(1, outputColor);
+
+        // Wait for step duration
+        delay(stepDuration);
+    }
+
+    // Restore original brightness
+    maxBrightness = originalBrightness;
+
+    // Reset the flag
+    swatchPreviewActive = false;
 }

@@ -9,6 +9,9 @@ uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
 
+// Swatch preview animation flag
+bool swatchPreviewActive = false;
+
 // Replace std::array with plain C arrays to save significant flash memory
 float tuneRatio[3] = {1.0, 1.0, 1.0};
 uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
@@ -66,6 +69,9 @@ void checkButtons() {
 
                 // Save the new swatch number to flash
                 saveSettingsToFlash(swNum);
+
+                // Trigger swatch preview animation
+                swatchPreviewActive = true;
             }
             colorButtonLastState = colorButtonState;
         }
