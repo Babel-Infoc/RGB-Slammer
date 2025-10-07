@@ -15,7 +15,6 @@ extern ledSegment led[];
 
 // Pin definitions
 extern uint8_t colorBtn;
-extern uint8_t animBtn;
 extern const uint8_t numLEDs;
 
 // LED luminance information
@@ -40,13 +39,6 @@ extern const uint8_t slowDown;
 // MARK: ------------------------------ Button handling ------------------------------
 // Current color swatch
 extern uint8_t colorIndex;
-
-// Current animation index
-extern const uint8_t numAnimations;
-extern uint8_t animIndex;
-
-// Flag to signal animation interruption
-extern bool animInterrupt;
 
 // MARK: ------------------------------ Functions ------------------------------
 void calculateLuminance();

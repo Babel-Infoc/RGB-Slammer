@@ -15,17 +15,15 @@ enum ConfigType {
 struct PinConfig {
     ledSegment leds[2];
     uint8_t colorButton;
-    uint8_t animButton;
 };
 
 // Configuration for Blinder Mini
 const PinConfig BLINDER_MINI = {
     .leds = {
         {PC4, PC5, PC6}, // Upper LEDs
-        {PD3, PD4, PD5}  // Lower LEDs
+        {PD4, PD5, PD3}  // Lower LEDs
     },
-    .colorButton = PD6,
-    .animButton = PD2
+    .colorButton = PD2
 };
 
 // Configuration for AG Echo Frame
@@ -34,8 +32,7 @@ const PinConfig AG_ECHO_FRAME = {
         {PD7, PD6, PD5}, // Eyepiece
         {PD2, PD3, PD4}  // Main body
     },
-    .colorButton = PC3,
-    .animButton = PC0
+    .colorButton = PC3
 };
 
 // Function to get the active configuration based on the selected hardware

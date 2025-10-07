@@ -3,14 +3,11 @@
 #include "swatches.h"
 #include "flashStorage.h"
 
-// Initialize the buttons
+// Initialize the button
 uint8_t colorButtonLastState = HIGH;
-uint8_t animButtonLastState = HIGH;
 uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
-// Flag to signal animation interruption
-bool animInterrupt = false;
 
 // Replace std::array with plain C arrays to save significant flash memory
 float tuneRatio[3] = {1.0, 1.0, 1.0};
@@ -61,8 +58,6 @@ void checkButtons() {
     if (debounceStart > 0) {
         debounceStart--;
     } else {
-        // Reset the interrupt flag
-        animInterrupt = false;
         // Check color button
         uint8_t colorButtonState = digitalRead(colorBtn);
         if (colorButtonState != colorButtonLastState) {
@@ -70,23 +65,9 @@ void checkButtons() {
                 swNum = (swNum + 1) % numSwatches;
 
                 // Save the new swatch number to flash
-                saveSettingsToFlash(swNum, animIndex);
+                saveSettingsToFlash(swNum);
             }
             colorButtonLastState = colorButtonState;
-        }
-
-        // Check animation button
-        uint8_t animButtonState = digitalRead(animBtn);
-        if (animButtonState != animButtonLastState) {
-            if (animButtonState == LOW) {
-                animIndex = (animIndex + 1) % numAnimations;
-                // Set the interrupt flag to break current animation
-                animInterrupt = true;
-
-                // Save the new animation index to flash
-                saveSettingsToFlash(swNum, animIndex);
-            }
-            animButtonLastState = animButtonState;
         }
 
         // Restart the debounce timer
