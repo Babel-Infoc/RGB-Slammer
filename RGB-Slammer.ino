@@ -24,18 +24,18 @@ ledSegment led[2];
 uint8_t colorBtn;
 
 // Set the default brightness modifier, 0.0 to 0.65 max
-float currentBrightness = 0.4;
+float currentBrightness = 0.5;
 // Temporary brightness value to be used when previewing the new swatch after changing it
-float pulseBrightness = 0.85;
+float pulseBrightness = 0.65;
 
 // Brightness adjustment settings
 const float minBrightness = 0.3;
-const float maxBrightness = 0.5;
+const float maxBrightness = 0.6;
 const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
 bool brightnessAdjustMode = false;
 
 // Slow down all animations by this amou nt (in milliseconds)
-const uint8_t slowDown = 0;
+const uint8_t slowDown = 2;
 
 // LED Color tuning
 // Define the light intensity of each LED color at the specified mA value
@@ -43,7 +43,7 @@ const uint8_t slowDown = 0;
 // {mA, luminosity}
 const luminance red       = {5, 45};
 const luminance green     = {5, 45};
-const luminance blue      = {5, 45};
+const luminance blue      = {5, 55};
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
@@ -162,8 +162,8 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             currentTime = millis();
         } else {
             // Normal flicker on both segments
-            flicker(0, flickerChance, 20, 255);
-            flicker(1, flickerChance, 150, 200);
+            flicker(0, flickerChance, 200, 255);
+            flicker(1, flickerChance, 0, 200);
             currentTime = millis();
         }
     }
@@ -398,32 +398,39 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
 // -------------------------------------------------------------------------------------
 // MARK: swatchPreview
 void swatchPreview() {
-    const int totalDuration = 500; // 0.5 seconds
-    const int steps = 50; // Number of animation steps
-    const int stepDuration = totalDuration / steps;
+    const int fadeUpDuration = 50; // 0.2 seconds fade up
+    const int fadeDownDuration = 400; // 0.6 seconds fade down
+    const int fadeUpSteps = 20; // Steps for fade up
+    const int fadeDownSteps = 60; // Steps for fade down
 
     // Store original brightness and temporarily increase it
     float originalBrightness = currentBrightness;
-    // Constrain pulse brightness to prevent overflow
-    currentBrightness = constrain(pulseBrightness, 0.0, maxBrightness);
+    currentBrightness = pulseBrightness;
 
-    unsigned long startTime = millis();
-
-    // Animate through the full gradient from background (255) to primary (0)
-    for (int i = 0; i < steps; i++) {
-        // Calculate gradient position (255 = background, 0 = primary)
-        uint8_t gradientPos = 255 - ((i * 255) / (steps - 1));
+    // Phase 1: Fade UP quickly from dark to bright over 0.2 seconds
+    for (int i = 0; i < fadeUpSteps; i++) {
+        uint8_t gradientPos = (i * 255) / (fadeUpSteps - 1); // Start at 0 (bright), go to 255 (dark)
         uint8_t outputColor[3];
 
-        // Get the color at this gradient position
         gradientPosition(gradientPos, outputColor);
 
-        // Apply to both LED segments
         sendToRGB(0, outputColor);
         sendToRGB(1, outputColor);
 
-        // Wait for step duration
-        delay(stepDuration);
+        delay(fadeUpDuration / fadeUpSteps);
+    }
+
+    // Phase 2: Fade DOWN slowly from bright to dark over 0.6 seconds
+    for (int i = 0; i < fadeDownSteps; i++) {
+        uint8_t gradientPos = ((fadeDownSteps - 1 - i) * 255) / (fadeDownSteps - 1); // Start at 255 (dark), go to 0 (bright)
+        uint8_t outputColor[3];
+
+        gradientPosition(gradientPos, outputColor);
+
+        sendToRGB(0, outputColor);
+        sendToRGB(1, outputColor);
+
+        delay(fadeDownDuration / fadeDownSteps);
     }
 
     // Restore original brightness
