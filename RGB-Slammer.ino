@@ -28,10 +28,10 @@ uint8_t animBtn;
 uint8_t animIndex = 0;
 
 // Maximum brightness modifier, 0-255
-const float maxBrightness = 0.4;
+const float maxBrightness = 0.5;
 
 // Slow down all animations by this amount (in milliseconds)
-const uint8_t slowDown = 0;
+const uint8_t slowDown = 5;
 
 // LED Color tuning
 // Define the light intensity of each LED color at the specified mA value

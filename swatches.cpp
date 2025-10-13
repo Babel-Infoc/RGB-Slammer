@@ -1,8 +1,9 @@
 #include "swatches.h"
 #include <Arduino.h>
 
-// Define macro to convert rgb(r, g, b) to {r, g, b}
+// Define macro to convert rgb(r, g, b) to {r, g, b} for VSCode color tags
 #define rgb(r, g, b) {r, g, b}
+#define rgba(r, g, b, a) {r, g, b}
 
 // Initialise the swatch array index
 uint8_t swNum = 0;
@@ -16,113 +17,179 @@ uint8_t swNum = 0;
 */
 // Master array of swatches
 swatchArray swatch[] = {
-    {   // Heat treated
-        rgb(255,    196,    0),
-        rgb(255, 38, 0),
-        rgb(149,    0,      255),
-        rgb(55, 0, 255),
-        rgb(0,      0,      0),
-    },
     {
+        // Heat treated
+        rgba(255,   220,    106,    1),
+        rgba(209,   0,      52,     1),
+        rgba(75,    0,      130,    1),
+        rgba(0,     0,      97,     1),
+        rgba(0,     0,      0,      1)
+    },{
         // Hazard pay
-        rgb(255, 145, 0),
-        rgb(255, 72, 0),
-        rgb(255, 0, 162),
-        rgb(100,    0,      0),
-        rgb(50,    0,      0),
-    },
-    {
-        // Green
-        rgb(238, 255, 0),
-        rgb(115, 255, 0),
-        rgb(0, 255, 179),
-        rgb(0,    100,      0),
-        rgb(0,    50,       0),
-    },
-    {
-        // Blue
-        rgb(225, 0, 255),
-        rgb(98, 0, 255),
-        rgb(0, 119, 255),
-        rgb(0,    0,      100),
-        rgb(0,    0,      50),
-    },
-    {   // Brandi
-        rgb(255,    0,      255),
-        rgb(255,    0,      200),
-        rgb(255,    0,      150),
-        rgb(218, 0, 109),
-        rgb(100,    0,      50),
-    },
-    {   // Assegai
-        rgb(255, 111, 0),
-        rgb(255, 225, 0),
-        rgb(0, 225, 255),
-        rgb(166, 0, 255),
-        rgb(92, 222, 0),
-    },
-    {   // Villa Straylight
-        rgb(186, 143, 255),
-        rgb(187, 142, 255),
-        rgb(149, 111, 255),
-        rgb(60, 0, 199),
-        rgb(40,     40,     50),
-    },
-    {   // Wintermute
-        rgb(0,      255,    255),
-        rgb(0, 208, 255),
-        rgb(255, 0, 68),
-        rgb(128, 0, 219),
-        rgb(85,     0,      141),
-    },
-    {   // Chemical spill
-        rgb(166,    255,    0),
-        rgb(145,    255,    0),
-        rgb(136, 0, 255),
-        rgb(107, 0, 230),
-        rgb(65,     0,      131),
-    },
-    {   // Strawbs
-        rgb(166,    255,    0),
-        rgb(145,    255,    0),
-        rgb(255, 0, 200),
-        rgb(230, 0, 88),
-        rgb(131, 0, 50),
-    },
-    {   // Classic synthwave
-        rgb(255,    0,      255),
-        rgb(255, 0, 230),
-        rgb(0, 255, 242),
-        rgb(0, 233, 209),
-        rgb(0,      0,      0),
-    },
-    {   // Redshift
-        rgb(130, 108, 255),
-        rgb(68, 0, 255),
-        rgb(204, 0, 255),
-        rgb(204, 0, 0),
-        rgb(102,    0,      26),
-    },
-    {   // Chromatic abberation
-        rgb(255, 112, 112),
-        rgb(255,    255,    255),
-        rgb(65, 122, 255),
-        rgb(130, 130, 130),
-        rgb(20,     20,     20),
-    },
+        rgba(255,   200,    0,      1),
+        rgba(255,   150,    0,      1),
+        rgba(200,   100,    0,      1),
+        rgba(100,   50,     0,      1),
+        rgba(50,    0,      0,      1),
+    },{
+        // Red mist
+        rgba(255,   150,    150,    1),
+        rgba(255,   0,      150,    1),
+        rgba(200,   0,      100,    1),
+        rgba(150,   0,      50,     1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Arasaka
+        rgba(255,   0,      0,      1),
+        rgba(200,   0,      0,      1),
+        rgba(150,   0,      0,      1),
+        rgba(100,   0,      0,      1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Acid spill
+        rgba(0,     255,    200,    1),
+        rgba(0,     255,    150,    1),
+        rgba(0,     200,    100,    1),
+        rgba(0,     100,    50,     1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Mox
+        rgba(150,   255,    150,    1),
+        rgba(150,   255,    0,      1),
+        rgba(100,   200,    0,      1),
+        rgba(50,    150,    0,      1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Static romance
+        rgba(200,   0,      255,    1),
+        rgba(150,   0,      255,    1),
+        rgba(100,   0,      200,    1),
+        rgba(50,    0,      100,    1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Corpo
+        rgba(150,   150,    255,    1),
+        rgba(0,     150,    255,    1),
+        rgba(0,     100,    200,    1),
+        rgba(0,     50,     150,    1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Radioactive
+        rgba(255,   255,    150,    1),
+        rgba(255,   255,    0,      1),
+        rgba(200,   250,    0,      1),
+        rgba(120,   100,    0,      1),
+        rgba(100,   50,     0,      1),
+    },{
+        // Brandi
+        rgba(255,   0,      255,    1),
+        rgba(200,   0,      200,    1),
+        rgba(150,   0,      150,    1),
+        rgba(100,   0,      100,    1),
+        rgba(50,    0,      50,     1),
+    },{
+        // Wintermute
+        rgba(0,   255,      255,    1),
+        rgba(0,   200,      200,    1),
+        rgba(0,   150,      150,    1),
+        rgba(0,   100,      100,    1),
+        rgba(0,    50,      50,     1),
+    },{
+        // Mono
+        rgba(255,   255,    255,    1),
+        rgba(200,   200,    200,    1),
+        rgba(150,   150,    150,    1),
+        rgba(100,   100,    100,    1),
+        rgba(10,    10,     10,     1),
+    },{
+        // Classic synthwave
+        rgba(255,   0,      200,    1),
+        rgba(200,   0,      100,    1),
+        rgba(0,     200,    255,    1),
+        rgba(50,    0,      200,    1),
+        rgba(100,   0,      50,     1),
+    },{
+        // Villa Straylight
+        rgba(50,    200,    255,    1),
+        rgba(200,   50,     255,    1),
+        rgba(150,   80,     255,    1),
+        rgba(100,   40,     255,    1),
+        rgba(50,    20,     255,    1),
+    },{
+        // Sunset peach
+        rgba(255,   100,    0,      1),
+        rgba(200,   50,     0,      1),
+        rgba(255,   0,      100,    1),
+        rgba(200,   0,      150,    1),
+        rgba(0,     0,      0,      1)
+    },{
+        // Neon overdrive
+        rgba(255,   0,      150,    1),
+        rgba(0,     255,    200,    1),
+        rgba(150,   0,      255,    1),
+        rgba(255,   200,    0,      1),
+        rgba(0,     0,      50,     1),
+    },{
+        // Chemical waste
+        rgba(255,   100,    0,      1),
+        rgba(255,   200,    50,     1),
+        rgba(0,     150,    255,    1),
+        rgba(0,     50,     150,    1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Neurotoxin
+        rgba(200,   255,    0,      1),
+        rgba(255,   0,      200,    1),
+        rgba(0,     255,    150,    1),
+        rgba(100,   0,      150,    1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Outlier
+        rgba(255,   50,     0,      1),
+        rgba(255,   150,    0,      1),
+        rgba(100,   0,      255,    1),
+        rgba(0,     100,    200,    1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Turbo killer
+        rgba(150,   0,      200,    1),
+        rgba(255,   0,      100,    1),
+        rgba(0,     100,    255,    1),
+        rgba(50,    0,      100,    1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Neon rain
+        rgba(0,     255,    255,    1),
+        rgba(255,   100,    200,    1),
+        rgba(0,     200,    100,    1),
+        rgba(100,   0,      150,    1),
+        rgba(0,     0,      50,     1),
+    },{
+        // BD Star
+        rgba(255,   0,      255,    1),
+        rgba(0,     200,    255,    1),
+        rgba(255,   150,    0,      1),
+        rgba(150,   0,      200,    1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Wasteland
+        rgba(255,   180,    0,      1),
+        rgba(255,   80,     150,    1),
+        rgba(150,   0,      255,    1),
+        rgba(100,   50,     0,      1),
+        rgba(0,     0,      0,      1),
+    },{
+        // Holo drift
+        rgba(0,     255,    150,    1),
+        rgba(100,   150,    255,    1),
+        rgba(200,   0,      255,    1),
+        rgba(0,     100,    150,    1),
+        rgba(0,     0,      50,     1),
+    }
 };
 
 // Calculate the number of swatches automatically based on array size
 uint8_t numSwatches = sizeof(swatch) / sizeof(swatch[0]);
-
-// Colors used for the bootup animation
-const uint8_t bootswatch[5][3] = {
-    rgb(255, 220, 106),
-    rgb(209, 0, 52),
-    rgb(75, 0, 130),
-    rgb(0, 0, 97),
-    rgb(0, 0, 0)
-};
 
 // MARK: gradientPosition ------------------------------------------------------------------------------------------------
 // Calculates a gradient rgb color between all 5 colors in the current swatch
