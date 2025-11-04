@@ -77,7 +77,7 @@ void setup() {
     if (!loadSettingsFromFlash(&swNum, &currentBrightness)) {
         // If no valid settings found, use defaults (which are already set in declarations)
         swNum = 0;
-        currentBrightness = 0.3; // Default brightness
+        currentBrightness = 0.4; // Default brightness
     }
 
     // Show the bootup animation
