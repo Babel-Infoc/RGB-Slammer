@@ -24,7 +24,7 @@ ledSegment led[2];
 uint8_t colorBtn;
 
 // Set the default brightness modifier, 0.0 to 0.65 max
-float currentBrightness = 0.5;
+float currentBrightness = 0.4;
 // Temporary brightness value to be used when previewing the new swatch after changing it
 float pulseBrightness = 0.65;
 
@@ -35,7 +35,7 @@ const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold but
 bool brightnessAdjustMode = false;
 
 // Slow down all animations by this amou nt (in milliseconds)
-const uint8_t slowDown = 2;
+const uint8_t slowDown = 1;
 
 // LED Color tuning
 // Define the light intensity of each LED color at the specified mA value
@@ -76,7 +76,7 @@ void setup() {
     // Try to load saved settings from flash
     if (!loadSettingsFromFlash(&swNum, &currentBrightness)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 0;
+        swNum = 23;
         currentBrightness = 0.4; // Default brightness
     }
 

@@ -33,11 +33,8 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
     Both segments can be configured for separate colors and animations, which will all run simultaneously
 - ### Preconfigured animations
     Included is a number of preconfigured animation elements and longer animation cycles, which are easily configured using main loop arguments
-- ### Max output brightness
-    `maxBrightness` output modifier, configure between 0 and 255
-- ### Ambient brightness
-    (feature in progress)
-    `ambientBrightness` float that can be modified by a light sensor if you have one
+- ### Configurable brightness modifier
+    Hold the button for 2 seconds to enter brightness adjustment mode. Keep holding, and release when desired brightness is reached.
 - ### Handover color
     Some animation subroutines are designed to fade in or interact with the last color displayed by the previous subroutine, as such all subroutines store their last RGB color in segment specific variables called handoverColor
 
