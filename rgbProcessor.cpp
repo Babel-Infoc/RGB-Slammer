@@ -3,14 +3,22 @@
 #include "swatches.h"
 #include "flashStorage.h"
 
-// Initialize the button
+// Initialize the buttons
 uint8_t colorButtonLastState = HIGH;
+uint8_t animButtonLastState = HIGH;
 uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
 
+// Animation mode (0 = glitchLoop, 1 = other animations...)
+uint8_t animationMode = 0;
+const uint8_t numAnimationModes = 1; // Currently only glitchLoop, expand this as you add more
+
 // Swatch preview animation flag
 bool swatchPreviewActive = false;
+
+// Animation preview flag
+bool animationPreviewActive = false;
 
 // Brightness adjustment mode variables
 unsigned long buttonPressStartTime = 0;
@@ -20,8 +28,10 @@ bool buttonHeldFor2Seconds = false;
 float tuneRatio[3] = {1.0, 1.0, 1.0};
 uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
 
-// Reference to the led array defined in the main sketch
+// Reference to the led array and buttons defined in the main sketch
 extern ledSegment led[2];
+extern uint8_t colorBtn;
+extern uint8_t animBtn;
 extern float currentBrightness;
 
 // MARK: Gamma Correction ------------------------------
@@ -80,13 +90,13 @@ void checkButtons() {
                 if (!buttonHeldFor2Seconds) {
                     // Short press - change swatch
                     swNum = (swNum + 1) % numSwatches;
-                    saveSettingsToFlash(swNum, currentBrightness);
+                    saveSettingsToFlash(swNum, currentBrightness, animationMode);
                     swatchPreviewActive = true;
                 } else {
                     // Long press was released - exit brightness mode and save brightness
                     brightnessAdjustMode = false;
                     // Save both swatch and current brightness to flash
-                    saveSettingsToFlash(swNum, currentBrightness);
+                    saveSettingsToFlash(swNum, currentBrightness, animationMode);
                 }
                 buttonHeldFor2Seconds = false;
             }
@@ -97,6 +107,19 @@ void checkButtons() {
                 buttonHeldFor2Seconds = true;
                 brightnessAdjustMode = true;
             }
+        }
+
+        // Check animation button
+        uint8_t animButtonState = digitalRead(animBtn);
+
+        if (animButtonState != animButtonLastState) {
+            if (animButtonState == LOW) {
+                // Button just pressed - cycle to next animation mode
+                animationMode = (animationMode + 1) % numAnimationModes;
+                saveSettingsToFlash(swNum, currentBrightness, animationMode);
+                animationPreviewActive = true;
+            }
+            animButtonLastState = animButtonState;
         }
 
         // Restart the debounce timer

@@ -12,16 +12,20 @@ This script is best edited in VSCode for color token selection in swatches.cpp
 #include "waveforms.h"
 #include "flashStorage.h"
 #include "pinouts.h"
+
+// Forward declarations
+void animationPreview();
+
 // Number of LED segments
 const uint8_t numLEDs = 2;
 
 // Select which hardware configuration to use
-// Options: CONFIG_BLINDER_MINI, CONFIG_AG_ECHO_FRAME
-ConfigType activeConfig = CONFIG_BLINDER_MINI;
+ConfigType activeConfig = AURORA_GLASYA;
 
 // Define the LED array and button pins according to the active configuration
 ledSegment led[2];
 uint8_t colorBtn;
+uint8_t animBtn;
 
 // Set the default brightness modifier, 0.0 to 0.65 max
 float currentBrightness = 0.4;
@@ -55,6 +59,7 @@ void setup() {
     led[0] = config.leds[0];
     led[1] = config.leds[1];
     colorBtn = config.colorButton;
+    animBtn = config.animButton;
 
     // Set up all LED segments
     for (uint8_t segment = 0; segment < 2; segment++) {
@@ -62,8 +67,9 @@ void setup() {
         pinMode(led[segment].green, OUTPUT);
         pinMode(led[segment].blue, OUTPUT);
     }
-    // Set up the color button
+    // Set up the buttons
     pinMode(colorBtn, INPUT_PULLUP);
+    pinMode(animBtn, INPUT_PULLUP);
 
     // Calculate the luminosity modifiers
     calculateLuminance();
@@ -74,10 +80,11 @@ void setup() {
 
 
     // Try to load saved settings from flash
-    if (!loadSettingsFromFlash(&swNum, &currentBrightness)) {
+    if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
         swNum = 23;
         currentBrightness = 0.4; // Default brightness
+        animationMode = 0; // Default to glitchLoop
     }
 
     // Show the bootup animation
@@ -97,8 +104,25 @@ void loop() {
     // Check if swatch preview animation should play
     else if (swatchPreviewActive) {
         swatchPreview();
+    }
+    // Check if animation preview should play
+    else if (animationPreviewActive) {
+        animationPreview();
     } else {
-        glitchLoop(70, 20, 1000);
+        // Run the selected animation mode
+        switch (animationMode) {
+            case 0:
+            default:
+                glitchLoop(70, 20, 1000);
+                break;
+            // Add more animation modes here as you create them:
+            // case 1:
+            //     smoothPulseLoop();
+            //     break;
+            // case 2:
+            //     strobeLoop();
+            //     break;
+        }
     }
 }
 
@@ -438,6 +462,36 @@ void swatchPreview() {
 
     // Reset the flag
     swatchPreviewActive = false;
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: animationPreview
+void animationPreview() {
+    const int flashDuration = 100; // Quick flash duration in ms
+    const int numFlashes = 3; // Number of flashes to indicate mode change
+
+    // Store original brightness and temporarily increase it
+    float originalBrightness = currentBrightness;
+    currentBrightness = pulseBrightness;
+
+    // Flash the primary color quickly to indicate animation mode change
+    for (int i = 0; i < numFlashes; i++) {
+        // Bright flash
+        sendToRGB(0, swatch[swNum].primary);
+        sendToRGB(1, swatch[swNum].primary);
+        delay(flashDuration);
+
+        // Dark flash
+        sendToRGB(0, swatch[swNum].background);
+        sendToRGB(1, swatch[swNum].background);
+        delay(flashDuration);
+    }
+
+    // Restore original brightness
+    currentBrightness = originalBrightness;
+
+    // Reset the flag
+    animationPreviewActive = false;
 }
 
 // -------------------------------------------------------------------------------------

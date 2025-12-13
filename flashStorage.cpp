@@ -24,7 +24,7 @@ uint8_t calculateChecksum(const FlashSettings* settings) {
 }
 
 // Load settings from flash memory
-bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness) {
+bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness, uint8_t* animationMode) {
     // Point to the flash memory where settings are stored
     const FlashSettings* storedSettings = (const FlashSettings*)FLASH_SETTINGS_PAGE_ADDR;
 
@@ -38,6 +38,7 @@ bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness) {
                 *swatchNum = storedSettings->swatchNumber;
                 // Convert brightness from 0-255 scale back to 0.0-1.0 scale
                 *brightness = (float)storedSettings->brightness / 255.0f;
+                *animationMode = storedSettings->animationMode;
                 return true;
             }
         }
@@ -48,7 +49,7 @@ bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness) {
 }
 
 // Save settings to flash memory
-bool saveSettingsToFlash(uint8_t swatchNum, float brightness) {
+bool saveSettingsToFlash(uint8_t swatchNum, float brightness, uint8_t animationMode) {
     // Don't attempt to save if values are out of expected range
     if (swatchNum >= numSwatches || brightness < 0.0f || brightness > 1.0f) {
         return false;
@@ -60,7 +61,7 @@ bool saveSettingsToFlash(uint8_t swatchNum, float brightness) {
     newSettings.swatchNumber = swatchNum;
     // Convert brightness from 0.0-1.0 scale to 0-255 scale for storage
     newSettings.brightness = (uint8_t)(brightness * 255.0f);
-    newSettings.padding = 0;  // Clear padding
+    newSettings.animationMode = animationMode;
     newSettings.checksum = calculateChecksum(&newSettings);
 
     // Unlock flash for writing

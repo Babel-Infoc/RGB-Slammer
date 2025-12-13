@@ -15,6 +15,7 @@ extern ledSegment led[];
 
 // Pin definitions
 extern uint8_t colorBtn;
+extern uint8_t animBtn;
 extern const uint8_t numLEDs;
 
 // LED luminance information
@@ -41,8 +42,14 @@ extern const uint8_t slowDown;
 // Current color swatch
 extern uint8_t colorIndex;
 
+// Current animation mode
+extern uint8_t animationMode;
+
 // Swatch preview animation flag
 extern bool swatchPreviewActive;
+
+// Animation preview flag
+extern bool animationPreviewActive;
 
 // Brightness adjustment mode flag
 extern bool brightnessAdjustMode;
@@ -54,5 +61,6 @@ extern const unsigned long brightnessModeTriggerTime;
 void calculateLuminance();
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);
 void swatchPreview();
+void animationPreview();
 void brightnessAdjustmentMode();
 #endif // TYPES_H
