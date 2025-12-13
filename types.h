@@ -16,6 +16,8 @@ extern ledSegment led[];
 // Pin definitions
 extern uint8_t colorBtn;
 extern uint8_t animBtn;
+extern uint8_t motorPinA;
+extern uint8_t motorPinB;
 extern const uint8_t numLEDs;
 
 // LED luminance information
@@ -33,7 +35,7 @@ extern const luminance blue;
 
 // MARK: ------------------------------ Global variables ------------------------------
 // Handover color
-extern uint8_t handoverColor[2][3];
+extern uint8_t handoverColor[3][3];
 
 // CPU slowdown
 extern const uint8_t slowDown;
@@ -57,10 +59,17 @@ extern bool brightnessAdjustMode;
 // Brightness mode trigger time
 extern const unsigned long brightnessModeTriggerTime;
 
+// MARK: ------------------------------ Motor Control ------------------------------
+extern bool motorEnabled;       // Whether motor control is enabled
+
 // MARK: ------------------------------ Functions ------------------------------
 void calculateLuminance();
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);
 void swatchPreview();
 void animationPreview();
 void brightnessAdjustmentMode();
+void motorForward();
+void motorReverse();
+void motorOff();
+void motorStop();
 #endif // TYPES_H

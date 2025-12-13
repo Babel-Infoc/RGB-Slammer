@@ -26,10 +26,10 @@ bool buttonHeldFor2Seconds = false;
 
 // Replace std::array with plain C arrays to save significant flash memory
 float tuneRatio[3] = {1.0, 1.0, 1.0};
-uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
+uint8_t handoverColor[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
 // Reference to the led array and buttons defined in the main sketch
-extern ledSegment led[2];
+extern ledSegment led[3];
 extern uint8_t colorBtn;
 extern uint8_t animBtn;
 extern float currentBrightness;
