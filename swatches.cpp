@@ -18,13 +18,6 @@ uint8_t swNum = 0;
 // Master array of swatches
 swatchArray swatch[] = {
     {
-        // Heat treated
-        rgba(255,   220,    106,    1),
-        rgba(209,   0,      52,     1),
-        rgba(75,    0,      130,    1),
-        rgba(0,     0,      97,     1),
-        rgba(0,     0,      0,      1)
-    },{
         // Hazard pay
         rgba(255,   200,    0,      1),
         rgba(255,   150,    0,      1),
@@ -121,6 +114,13 @@ swatchArray swatch[] = {
         rgba(200,   50,     0,      1),
         rgba(255,   0,      100,    1),
         rgba(200,   0,      150,    1),
+        rgba(0,     0,      0,      1)
+    },{
+        // Heat treated
+        rgba(255,   220,    106,    1),
+        rgba(209,   0,      52,     1),
+        rgba(75,    0,      130,    1),
+        rgba(0,     0,      97,     1),
         rgba(0,     0,      0,      1)
     },{
         // Neon overdrive

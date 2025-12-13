@@ -12,34 +12,42 @@ This script is best edited in VSCode for color token selection in swatches.cpp
 #include "waveforms.h"
 #include "flashStorage.h"
 #include "pinouts.h"
+
+// Forward declarations
+void animationPreview();
+
 // Number of LED segments
 const uint8_t numLEDs = 2;
 
 // Select which hardware configuration to use
-// Options: CONFIG_BLINDER_MINI, CONFIG_AG_ECHO_FRAME
-ConfigType activeConfig = CONFIG_AG_ECHO_FRAME;
+ConfigType activeConfig = AURORA_GLASYA;
 
 // Define the LED array and button pins according to the active configuration
 ledSegment led[2];
 uint8_t colorBtn;
 uint8_t animBtn;
 
-// Animation index - current animation being played
-uint8_t animIndex = 0;
+// Set the default brightness modifier, 0.0 to 0.65 max
+float currentBrightness = 0.4;
+// Temporary brightness value to be used when previewing the new swatch after changing it
+float pulseBrightness = 0.65;
 
-// Maximum brightness modifier
+// Brightness adjustment settings
+const float minBrightness = 0.3;
 const float maxBrightness = 0.6;
+const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
+bool brightnessAdjustMode = false;
 
-// Slow down all animations by this amount (in milliseconds)
-const uint8_t slowDown = 5;
+// Slow down all animations by this amou nt (in milliseconds)
+const uint8_t slowDown = 1;
 
 // LED Color tuning
 // Define the light intensity of each LED color at the specified mA value
 // Check your LEDs datasheet for typical luminosity values for standard forward current
 // {mA, luminosity}
-const luminance red       = {20, 630};
-const luminance green     = {20, 530};
-const luminance blue      = {20, 475};
+const luminance red       = {5, 45};
+const luminance green     = {5, 45};
+const luminance blue      = {5, 55};
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
@@ -59,7 +67,7 @@ void setup() {
         pinMode(led[segment].green, OUTPUT);
         pinMode(led[segment].blue, OUTPUT);
     }
-    // Set up the color and animation buttons
+    // Set up the buttons
     pinMode(colorBtn, INPUT_PULLUP);
     pinMode(animBtn, INPUT_PULLUP);
 
@@ -72,10 +80,11 @@ void setup() {
 
 
     // Try to load saved settings from flash
-    if (!loadSettingsFromFlash(&swNum, &animIndex)) {
+    if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 0;
-        animIndex = 0;
+        swNum = 23;
+        currentBrightness = 0.4; // Default brightness
+        animationMode = 0; // Default to glitchLoop
     }
 
     // Show the bootup animation
@@ -85,23 +94,35 @@ void setup() {
 /*=======================================================================================
 // MARK:                                Main loop                                      //
 =======================================================================================*/
-// The animation functions that can be cycled through with the button press are defined here
-
-// How many total animations in the loop?
-extern const uint8_t numAnimations = 9;
+// Only runs the glitchLoop animation
 
 void loop() {
-    switch (animIndex) {
-        //case 0: waveformFade(0); break;
-        case 0: glitchLoop(70, 20, 1000); break;
-        case 1: progressiveFade1(1400); break;
-        case 2: progressiveFade2(1400); break;
-        case 3: randomFade(20, 1000); break;
-        case 4: pulseColor(30); break;
-        case 5: pulse2(40); break;
-        case 6: photoshootMode1(); break;
-        case 7: photoshootMode2(65, 210); break;
-        case 8: photoshootMode3(); break;
+    // Check if brightness adjustment mode should be active
+    if (brightnessAdjustMode) {
+        brightnessAdjustmentMode();
+    }
+    // Check if swatch preview animation should play
+    else if (swatchPreviewActive) {
+        swatchPreview();
+    }
+    // Check if animation preview should play
+    else if (animationPreviewActive) {
+        animationPreview();
+    } else {
+        // Run the selected animation mode
+        switch (animationMode) {
+            case 0:
+            default:
+                glitchLoop(70, 20, 1000);
+                break;
+            // Add more animation modes here as you create them:
+            // case 1:
+            //     smoothPulseLoop();
+            //     break;
+            // case 2:
+            //     strobeLoop();
+            //     break;
+        }
     }
 }
 
@@ -109,103 +130,19 @@ void loop() {
 //                                    End main loop                                    //
 =======================================================================================*/
 
-// -------------------------------- Animation Functoins --------------------------------
-// MARK: pulseColor
-// Pulses from primary through to background colors in the active swatch, over <speed> milliseconds
-void pulseColor(const int duration){
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      (duration));
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,       (duration));
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      (duration));
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,     (duration));
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      (duration));
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,       (duration));
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      (duration*2));
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,     (duration*4));
-    fadeToColor(swatch[swNum].background,   swatch[swNum].background,   (duration*6));
-}
-
 // -------------------------------------------------------------------------------------
-// MARK: progressiveFade
-// Fades through all colors in the active swatch in order, over <duration> milliseconds
-void progressiveFade1(const int speed) {
-    unsigned long start = millis();
-    uint8_t outputColor[3];
-    // Fade up over <speed> milliseconds
-    while (millis() - start < speed) {
-        // count up from 0 to 255 over speed milliseconds
-        uint8_t progress = (uint8_t)((millis() - start) * 255 / speed);
-        gradientPosition(progress, outputColor);
-        showColor(outputColor, outputColor, 10);
+// MARK: bounceBoot
+void bounceBoot(int speed){
+    for (uint8_t reps = 0; reps < 3; reps++) {
+        if (reps == 2) speed = speed * 3;
+        fadeToColor(swatch[swNum].primary,      swatch[swNum].background,   speed);
+        fadeToColor(swatch[swNum].accent,       swatch[swNum].primary,      speed);
+        fadeToColor(swatch[swNum].midtone,      swatch[swNum].accent,       speed);
+        fadeToColor(swatch[swNum].contrast,     swatch[swNum].midtone,      speed);
+        fadeToColor(swatch[swNum].background,   swatch[swNum].contrast,     speed);
+        fadeToColor(swatch[swNum].background,   swatch[swNum].background,   speed);
     }
-    // Fade down over <speed> milliseconds
-    start = millis(); // Reset start time for fade down
-    while (millis() - start < speed) {
-        // count down from 255 to 0 over speed milliseconds
-        uint8_t progress = (uint8_t)(255 - ((millis() - start) * 255 / speed));
-        gradientPosition(progress, outputColor);
-        showColor(outputColor, outputColor, 10);
-    }
-}
-
-void progressiveFade2(const int speed) {
-    unsigned long start = millis();
-    uint8_t outputColor1[3];
-    uint8_t outputColor2[3];
-    // Fade up over <speed> milliseconds
-    while (millis() - start < speed) {
-        // count up from 0 to 255 over speed milliseconds
-        uint8_t progress1 = (uint8_t)((millis() - start) * 255 / speed);
-        // count down from 255 to 0 over speed milliseconds (reverse direction)
-        uint8_t progress2 = (uint8_t)(255 - ((millis() - start) * 255 / speed));
-        gradientPosition(progress1, outputColor1);
-        gradientPosition(progress2, outputColor2);
-        showColor(outputColor1, outputColor2, 10);
-    }
-    // Fade down over <speed> milliseconds
-    start = millis(); // Reset start time for fade down
-    while (millis() - start < speed) {
-        // count up from 0 to 255 over speed milliseconds
-        uint8_t progress1 = (uint8_t)(255 - (millis() - start) * 255 / speed);
-        // count down from 255 to 0 over speed milliseconds (reverse direction)
-        uint8_t progress2 = (uint8_t)(((millis() - start) * 255 / speed));
-        gradientPosition(progress1, outputColor1);
-        gradientPosition(progress2, outputColor2);
-        showColor(outputColor1, outputColor2, 10);
-    }
-}
-
-// -------------------------------------------------------------------------------------
-// MARK: randomFade
-// Fades between random colors in the active swatch, each fade for a random speed defined by <min> and <max>
-void randomFade(const int min, const int max) {
-    // Get random color indices (0-3) for each LED channel
-    uint8_t color1 = random(0, swatchSize);
-    uint8_t color2 = random(0, swatchSize);
-
-    // Arrays to hold the selected colors for each LED
-    uint8_t* firstColor;
-    uint8_t* secondColor;
-
-    // Select the first color based on the random index
-    switch (color1) {
-        case 0: firstColor = swatch[swNum].primary;     break;
-        case 1: firstColor = swatch[swNum].accent;      break;
-        case 2: firstColor = swatch[swNum].midtone;     break;
-        case 3: firstColor = swatch[swNum].contrast;    break;
-        case 4: firstColor = swatch[swNum].background;  break;
-    }
-
-    // Select the second color based on the random index
-    switch (color2) {
-        case 0: secondColor = swatch[swNum].primary;    break;
-        case 1: secondColor = swatch[swNum].accent;     break;
-        case 2: secondColor = swatch[swNum].midtone;    break;
-        case 3: secondColor = swatch[swNum].contrast;   break;
-        case 4: secondColor = swatch[swNum].background; break;
-    }
-
-    // Fade between the two random colors with a random duration
-    fadeToColor(firstColor, secondColor, random(min, max));
+    showColor(swatch[0].background, swatch[0].background, speed*5);
 }
 
 // -------------------------------------------------------------------------------------
@@ -217,6 +154,11 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
     unsigned long currentTime = millis();
     bool effectTrigger = random(0, 100) < effectChance;
     while (currentTime - startTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         if (effectTrigger) {
             // Apply a special effect
             uint8_t flickerSegment = random(0, numLEDs);
@@ -244,62 +186,11 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             currentTime = millis();
         } else {
             // Normal flicker on both segments
-            flicker(0, flickerChance, 150, 200);
-            flicker(1, flickerChance, 50, 150);
+            flicker(0, flickerChance, 200, 255);
+            flicker(1, flickerChance, 0, 200);
             currentTime = millis();
         }
     }
-}
-
-// -------------------------------------------------------------------------------------
-// MARK: pulse2
-void pulse2(int speed){
-    for (uint8_t reps = 0; reps < 3; reps++) {
-        if (reps == 2) speed = speed * 3;
-        fadeToColor(swatch[swNum].primary,      swatch[swNum].background,   speed);
-        fadeToColor(swatch[swNum].accent,       swatch[swNum].primary,      speed);
-        fadeToColor(swatch[swNum].midtone,      swatch[swNum].accent,       speed);
-        fadeToColor(swatch[swNum].contrast,     swatch[swNum].midtone,      speed);
-        fadeToColor(swatch[swNum].background,   swatch[swNum].contrast,     speed);
-        fadeToColor(swatch[swNum].background,   swatch[swNum].background,   speed);
-    }
-    showColor(swatch[swNum].background, swatch[swNum].background, speed*5);
-}
-
-// -------------------------------------------------------------------------------------
-// MARK: bounceBoot
-void bounceBoot(int speed){
-    for (uint8_t reps = 0; reps < 3; reps++) {
-        if (reps == 2) speed = speed * 3;
-        fadeToColor(swatch[0].primary,      swatch[0].background,   speed);
-        fadeToColor(swatch[0].accent,       swatch[0].primary,      speed);
-        fadeToColor(swatch[0].midtone,      swatch[0].accent,       speed);
-        fadeToColor(swatch[0].contrast,     swatch[0].midtone,      speed);
-        fadeToColor(swatch[0].background,   swatch[0].contrast,     speed);
-        fadeToColor(swatch[0].background,   swatch[0].background,   speed);
-    }
-    showColor(swatch[0].background, swatch[0].background, speed*5);
-}
-
-// -------------------------------------------------------------------------------------
-// MARK: photoshootMode1
-// Shows the primary color only
-void photoshootMode1(){
-    showColor(swatch[swNum].primary, swatch[swNum].primary, 100);
-}
-
-// Primary and contrast
-void photoshootMode2(uint8_t color1, uint8_t color2){
-    uint8_t output1[3];
-    uint8_t output2[3];
-    gradientPosition(color1, output1);
-    gradientPosition(color2, output2);
-    showColor(output1, output2, 100);
-}
-
-// Midtone and Accent
-void photoshootMode3(){
-    showColor(swatch[swNum].midtone, swatch[swNum].accent, 100);
 }
 
 // -------------------------------------------------------------------------------------
@@ -317,6 +208,11 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 
     unsigned long startTime = millis();
     while (millis() - startTime < fadeTime) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         float fadeRatio = (float)(millis() - startTime) / fadeTime;
             for (int pin = 0; pin < 3; pin++) {
                 output[0][pin] = startColor[0][pin] + (color1[pin] - startColor[0][pin]) * fadeRatio;
@@ -332,6 +228,10 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
     unsigned long startTime = millis();
     while (millis() - startTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
         sendToRGB(0, color1);
         sendToRGB(1, color2);
     }
@@ -353,6 +253,11 @@ void glitch1(const uint8_t segment, int duration){
     uint8_t flickerTime = 50;
     unsigned long flashStartTime = millis();
     while (millis() - flashStartTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         if (segment == 0) {
             showColor(swatch[swNum].contrast, swatch[swNum].accent,50);
             showColor(swatch[swNum].contrast, swatch[swNum].background,50);
@@ -369,6 +274,10 @@ void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
     // Part 1: Rapidly flash between black and background for 1 second
     unsigned long flashStartTime = millis();
     while (millis() - flashStartTime < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
         rapidPulse(color1, color2, 50);
     }
 
@@ -390,6 +299,11 @@ void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     if (segment == 0) {otherSegment = 1;}
     // Hold otherSegment at its handoverColor, and flash segment between startColor and color2 twice
     for (int reps = 0; reps < 3; reps++) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         if (segment == 0) {
             showColor(startColor, handoverColor[1], duration);
             showColor(color2, handoverColor[1], duration);
@@ -406,6 +320,11 @@ void glitch4(uint8_t reps, int duration) {
     uint8_t color[3];
     unsigned long start = millis();
     while (millis() - start < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         for (uint8_t segment = 0; segment < numLEDs; segment++) {
             gradientPosition(random(1, 255), color);
             for (uint8_t i = 0; i < reps; i++) {
@@ -425,6 +344,11 @@ void glitch5(){
 
     // First play through the waveform once
     for (uint8_t i = 0; i < 32; i++) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         // Get color at this position in the gradient
         gradientPosition(waveform[waveformIndex].waveform[i], outputColor);
 
@@ -440,6 +364,11 @@ void glitch5(){
 
     // Then do some rapid random jumps between waveform positions
     for (uint8_t i = 0; i < 8; i++) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         uint8_t randomPos = random(0, 32);
         gradientPosition(waveform[waveformIndex].waveform[randomPos], outputColor);
         showColor(outputColor, outputColor, 30);
@@ -451,16 +380,6 @@ void glitch5(){
 
     // End with a final dramatic fade to black
     fadeToColor(swatch[swNum].contrast, swatch[swNum].background, 300);
-}
-
-// -------------------------------------------------------------------------------------
-// MARK: waveformFade
-void waveformFade(uint8_t index){
-    uint8_t outputColor[3];
-    for (uint8_t i = 0; i < 32; i++) {
-        gradientPosition(waveform[index].waveform[i], outputColor);
-        showColor(outputColor, outputColor, 50);
-    }
 }
 
 // -------------------------------------------------------------------------------------
@@ -481,6 +400,11 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
 
     unsigned long start = millis();
     while (millis() - start < duration) {
+        // Check if swatch preview should interrupt this animation
+        if (swatchPreviewActive) {
+            return; // Immediately exit to allow swatch preview to play
+        }
+
         int selection = random(0, 3);
         // Set LED colors based on selection
         if (selection == 0) {
@@ -493,4 +417,113 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
             showColor(output1, output1, interval);
         }
     }
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: swatchPreview
+void swatchPreview() {
+    const int fadeUpDuration = 50; // 0.2 seconds fade up
+    const int fadeDownDuration = 400; // 0.6 seconds fade down
+    const int fadeUpSteps = 20; // Steps for fade up
+    const int fadeDownSteps = 60; // Steps for fade down
+
+    // Store original brightness and temporarily increase it
+    float originalBrightness = currentBrightness;
+    currentBrightness = pulseBrightness;
+
+    // Phase 1: Fade UP quickly from dark to bright over 0.2 seconds
+    for (int i = 0; i < fadeUpSteps; i++) {
+        uint8_t gradientPos = (i * 255) / (fadeUpSteps - 1); // Start at 0 (bright), go to 255 (dark)
+        uint8_t outputColor[3];
+
+        gradientPosition(gradientPos, outputColor);
+
+        sendToRGB(0, outputColor);
+        sendToRGB(1, outputColor);
+
+        delay(fadeUpDuration / fadeUpSteps);
+    }
+
+    // Phase 2: Fade DOWN slowly from bright to dark over 0.6 seconds
+    for (int i = 0; i < fadeDownSteps; i++) {
+        uint8_t gradientPos = ((fadeDownSteps - 1 - i) * 255) / (fadeDownSteps - 1); // Start at 255 (dark), go to 0 (bright)
+        uint8_t outputColor[3];
+
+        gradientPosition(gradientPos, outputColor);
+
+        sendToRGB(0, outputColor);
+        sendToRGB(1, outputColor);
+
+        delay(fadeDownDuration / fadeDownSteps);
+    }
+
+    // Restore original brightness
+    currentBrightness = originalBrightness;
+
+    // Reset the flag
+    swatchPreviewActive = false;
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: animationPreview
+void animationPreview() {
+    const int flashDuration = 100; // Quick flash duration in ms
+    const int numFlashes = 3; // Number of flashes to indicate mode change
+
+    // Store original brightness and temporarily increase it
+    float originalBrightness = currentBrightness;
+    currentBrightness = pulseBrightness;
+
+    // Flash the primary color quickly to indicate animation mode change
+    for (int i = 0; i < numFlashes; i++) {
+        // Bright flash
+        sendToRGB(0, swatch[swNum].primary);
+        sendToRGB(1, swatch[swNum].primary);
+        delay(flashDuration);
+
+        // Dark flash
+        sendToRGB(0, swatch[swNum].background);
+        sendToRGB(1, swatch[swNum].background);
+        delay(flashDuration);
+    }
+
+    // Restore original brightness
+    currentBrightness = originalBrightness;
+
+    // Reset the flag
+    animationPreviewActive = false;
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: brightnessAdjustmentMode
+void brightnessAdjustmentMode() {
+    const int cycleDuration = 4000; // 4 seconds total
+    const int stepDuration = 100; // Update every 100ms
+
+    unsigned long modeStartTime = millis();
+
+    // Use white color for brightness display
+    uint8_t whiteColor[3] = {255, 255, 255};
+
+    while (brightnessAdjustMode && digitalRead(colorBtn) == LOW) {
+        unsigned long elapsedTime = millis() - modeStartTime;
+
+        // Simple triangle wave for brightness cycling
+        float cyclePos = (float)(elapsedTime % cycleDuration) / cycleDuration;
+        float brightnessRatio = (cyclePos < 0.5) ? cyclePos * 2 : 2 - (cyclePos * 2);
+
+        // Map to brightness range
+        currentBrightness = minBrightness + (maxBrightness - minBrightness) * brightnessRatio;
+
+        // Display white at current brightness on both segments
+        // Use direct LED control to avoid button checking interference
+        for (int i = 0; i < 10; i++) { // Display multiple times per step for stability
+            sendToRGB(0, whiteColor);
+            sendToRGB(1, whiteColor);
+            delay(stepDuration / 10);
+        }
+    }
+
+    // Reset mode flag
+    brightnessAdjustMode = false;
 }

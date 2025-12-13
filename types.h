@@ -25,7 +25,8 @@ struct luminance {
 };
 
 // Brightness and luminance globals
-extern const float maxBrightness;
+extern float currentBrightness;
+extern float pulseBrightness;
 extern const luminance red;
 extern const luminance green;
 extern const luminance blue;
@@ -41,14 +42,25 @@ extern const uint8_t slowDown;
 // Current color swatch
 extern uint8_t colorIndex;
 
-// Current animation index
-extern const uint8_t numAnimations;
-extern uint8_t animIndex;
+// Current animation mode
+extern uint8_t animationMode;
 
-// Flag to signal animation interruption
-extern bool animInterrupt;
+// Swatch preview animation flag
+extern bool swatchPreviewActive;
+
+// Animation preview flag
+extern bool animationPreviewActive;
+
+// Brightness adjustment mode flag
+extern bool brightnessAdjustMode;
+
+// Brightness mode trigger time
+extern const unsigned long brightnessModeTriggerTime;
 
 // MARK: ------------------------------ Functions ------------------------------
 void calculateLuminance();
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);
+void swatchPreview();
+void animationPreview();
+void brightnessAdjustmentMode();
 #endif // TYPES_H

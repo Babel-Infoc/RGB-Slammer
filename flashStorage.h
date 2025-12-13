@@ -8,12 +8,13 @@
 typedef struct {
     uint8_t signature;      // Used to verify if settings are valid
     uint8_t swatchNumber;   // Current swatch number
-    uint8_t animationIndex; // Current animation index
+    uint8_t brightness;     // Current brightness (scaled 0-255)
+    uint8_t animationMode;  // Current animation mode
     uint8_t checksum;       // Simple checksum for data verification
 } __attribute__((aligned(4))) FlashSettings;
 
 // Function prototypes
-bool loadSettingsFromFlash(uint8_t* swatchNum, uint8_t* animIndex);
-bool saveSettingsToFlash(uint8_t swatchNum, uint8_t animIndex);
+bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness, uint8_t* animationMode);
+bool saveSettingsToFlash(uint8_t swatchNum, float brightness, uint8_t animationMode);
 
 #endif // FLASH_STORAGE_H

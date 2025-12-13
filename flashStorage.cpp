@@ -1,6 +1,5 @@
 #include "flashStorage.h"
 #include "swatches.h"  // Include this to access numSwatches
-#include "types.h"     // Include this to access numAnimations
 
 // Signature value to identify valid settings
 #define SETTINGS_SIGNATURE 0xA5
@@ -25,7 +24,7 @@ uint8_t calculateChecksum(const FlashSettings* settings) {
 }
 
 // Load settings from flash memory
-bool loadSettingsFromFlash(uint8_t* swatchNum, uint8_t* animIndex) {
+bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness, uint8_t* animationMode) {
     // Point to the flash memory where settings are stored
     const FlashSettings* storedSettings = (const FlashSettings*)FLASH_SETTINGS_PAGE_ADDR;
 
@@ -34,11 +33,12 @@ bool loadSettingsFromFlash(uint8_t* swatchNum, uint8_t* animIndex) {
         uint8_t checksum = calculateChecksum(storedSettings);
         if (checksum == storedSettings->checksum) {
             // Valid settings found, but also check range validity
-            if (storedSettings->swatchNumber < numSwatches &&
-                storedSettings->animationIndex < numAnimations) {
+            if (storedSettings->swatchNumber < numSwatches) {
                 // Settings are valid, load them
                 *swatchNum = storedSettings->swatchNumber;
-                *animIndex = storedSettings->animationIndex;
+                // Convert brightness from 0-255 scale back to 0.0-1.0 scale
+                *brightness = (float)storedSettings->brightness / 255.0f;
+                *animationMode = storedSettings->animationMode;
                 return true;
             }
         }
@@ -49,9 +49,9 @@ bool loadSettingsFromFlash(uint8_t* swatchNum, uint8_t* animIndex) {
 }
 
 // Save settings to flash memory
-bool saveSettingsToFlash(uint8_t swatchNum, uint8_t animIndex) {
-    // Don't attempt to save if any values are out of expected range
-    if (swatchNum >= numSwatches || animIndex >= numAnimations) {
+bool saveSettingsToFlash(uint8_t swatchNum, float brightness, uint8_t animationMode) {
+    // Don't attempt to save if values are out of expected range
+    if (swatchNum >= numSwatches || brightness < 0.0f || brightness > 1.0f) {
         return false;
     }
 
@@ -59,7 +59,9 @@ bool saveSettingsToFlash(uint8_t swatchNum, uint8_t animIndex) {
     FlashSettings newSettings;
     newSettings.signature = SETTINGS_SIGNATURE;
     newSettings.swatchNumber = swatchNum;
-    newSettings.animationIndex = animIndex;
+    // Convert brightness from 0.0-1.0 scale to 0-255 scale for storage
+    newSettings.brightness = (uint8_t)(brightness * 255.0f);
+    newSettings.animationMode = animationMode;
     newSettings.checksum = calculateChecksum(&newSettings);
 
     // Unlock flash for writing
@@ -98,7 +100,7 @@ bool saveSettingsToFlash(uint8_t swatchNum, uint8_t animIndex) {
     // Verify the written data
     const FlashSettings* storedSettings = (const FlashSettings*)FLASH_SETTINGS_PAGE_ADDR;
     if (storedSettings->swatchNumber == swatchNum &&
-        storedSettings->animationIndex == animIndex &&
+        storedSettings->brightness == (uint8_t)(brightness * 255.0f) &&
         storedSettings->signature == SETTINGS_SIGNATURE &&
         storedSettings->checksum == calculateChecksum(storedSettings)) {
         return true;

@@ -8,8 +8,10 @@
 
 // Available configurations as enum for easier selection
 enum ConfigType {
-    CONFIG_BLINDER_MINI,
-    CONFIG_AG_ECHO_FRAME
+    NANOFRAME,
+    AURORA_GLASYA,
+    BLINDER_MINI,
+    AG_ECHO_FRAME
 };
 
 struct PinConfig {
@@ -18,35 +20,58 @@ struct PinConfig {
     uint8_t animButton;
 };
 
-// Configuration for Blinder Mini
-const PinConfig BLINDER_MINI = {
+// Configuration for Aurora Glasya
+const PinConfig NANOFRAME_PINOUT = {
     .leds = {
         {PC4, PC5, PC6}, // Upper LEDs
-        {PD3, PD4, PD5}  // Lower LEDs
+        {PD4, PD5, PD3}  // Lower LEDs
     },
     .colorButton = PD6,
-    .animButton = PD2
+    .animButton = PD7
+};
+
+// Configuration for Aurora Glasya
+const PinConfig AURORA_GLASYA_PINOUT = {
+    .leds = {
+        {PC4, PC5, PC6}, // Upper LEDs
+        {PD4, PD5, PD3}  // Lower LEDs
+    },
+    .colorButton = PD2,
+    .animButton = PC7
+};
+
+// Configuration for Blinder Mini
+const PinConfig BLINDER_MINI_PINOUT = {
+    .leds = {
+        {PC4, PC5, PC6}, // Upper LEDs
+        {PD4, PD5, PD3}  // Lower LEDs
+    },
+    .colorButton = PD2,
+    .animButton = PC7
 };
 
 // Configuration for AG Echo Frame
-const PinConfig AG_ECHO_FRAME = {
+const PinConfig AG_ECHO_FRAME_PINOUT = {
     .leds = {
         {PD7, PD6, PD5}, // Eyepiece
         {PD2, PD3, PD4}  // Main body
     },
     .colorButton = PC3,
-    .animButton = PC0
+    .animButton = PC4
 };
 
 // Function to get the active configuration based on the selected hardware
-// Pass in CONFIG_BLINDER_MINI or CONFIG_AG_ECHO_FRAME
 inline const PinConfig& getActiveConfig(ConfigType configType) {
     switch(configType) {
-        case CONFIG_BLINDER_MINI:
-            return BLINDER_MINI;
-        case CONFIG_AG_ECHO_FRAME:
+        case NANOFRAME:
+            return NANOFRAME_PINOUT;
+        case AURORA_GLASYA:
+            return AURORA_GLASYA_PINOUT;
+        case BLINDER_MINI:
+            return BLINDER_MINI_PINOUT;
+        case AG_ECHO_FRAME:
         default:
-            return AG_ECHO_FRAME;
+            return AG_ECHO_FRAME_PINOUT;
     }
 }
 
