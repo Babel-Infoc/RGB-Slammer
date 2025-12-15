@@ -12,7 +12,6 @@ MOTOR CONTROL:
   * motorForward()  - Rotate motor forward (PinA=HIGH, PinB=LOW)
   * motorReverse()  - Rotate motor reverse (PinA=LOW, PinB=HIGH)
   * motorOff()      - Stop motor (both pins LOW)
-  * motorStop()     - Alias for motorOff()
 - Motor is integrated into glitch effects for synchronized animations
 - WARNING: Never set both pins HIGH simultaneously (creates short circuit)
 */
@@ -37,8 +36,8 @@ ConfigType activeConfig = NANOFRAME;
 ledSegment led[3];
 uint8_t colorBtn;
 uint8_t animBtn;
-uint8_t motorPinA;
-uint8_t motorPinB;
+uint8_t motorPos;
+uint8_t motorNeg;
 
 // Set the default brightness modifier, 0.0 to 0.65 max
 float currentBrightness = 0.4;
@@ -78,15 +77,15 @@ void setup() {
     led[2] = config.leds[2];
     colorBtn = config.colorButton;
     animBtn = config.animButton;
-    motorPinA = config.motorPinA;
-    motorPinB = config.motorPinB;
+    motorPos = config.motorPos;
+    motorNeg = config.motorNeg;
 
     // Set up motor pins (if configured)
-    if (motorPinA != 0 && motorPinB != 0) {
-        pinMode(motorPinA, OUTPUT);
-        pinMode(motorPinB, OUTPUT);
-        digitalWrite(motorPinA, LOW);
-        digitalWrite(motorPinB, LOW); // Start with motor off
+    if (motorPos != 0 && motorNeg != 0) {
+        pinMode(motorPos, OUTPUT);
+        pinMode(motorNeg, OUTPUT);
+        digitalWrite(motorPos, LOW);
+        digitalWrite(motorNeg, LOW); // Start with motor off
     } else {
         motorEnabled = false;
     }
@@ -615,43 +614,38 @@ void brightnessAdjustmentMode() {
 
 // Rotate motor forward (PinA HIGH, PinB LOW)
 void motorForward() {
-    if (!motorEnabled || motorPinA == 0 || motorPinB == 0) {
+    if (!motorEnabled || motorPos == 0 || motorNeg == 0) {
         return; // Motor not available on this hardware
     }
 
-    digitalWrite(motorPinA, HIGH);
-    digitalWrite(motorPinB, LOW);
+    digitalWrite(motorPos, HIGH);
+    digitalWrite(motorNeg, LOW);
 }
 
 // Rotate motor in reverse (PinA LOW, PinB HIGH)
 void motorReverse() {
-    if (!motorEnabled || motorPinA == 0 || motorPinB == 0) {
+    if (!motorEnabled || motorPos == 0 || motorNeg == 0) {
         return; // Motor not available on this hardware
     }
 
-    digitalWrite(motorPinA, LOW);
-    digitalWrite(motorPinB, HIGH);
+    digitalWrite(motorPos, LOW);
+    digitalWrite(motorNeg, HIGH);
 }
 
 // Stop motor (both pins LOW)
 void motorOff() {
-    if (!motorEnabled || motorPinA == 0 || motorPinB == 0) {
+    if (!motorEnabled || motorPos == 0 || motorNeg == 0) {
         return;
     }
 
-    digitalWrite(motorPinA, LOW);
-    digitalWrite(motorPinB, LOW);
-}
-
-// Alias for motorOff
-void motorStop() {
-    motorOff();
+    digitalWrite(motorPos, LOW);
+    digitalWrite(motorNeg, LOW);
 }
 
 // Software PWM for motor control (manually toggles pins for speed control)
 // Call this repeatedly in a loop for continuous speed control
 void motorPWMCycle(uint8_t speed, bool forward) {
-    if (!motorEnabled || motorPinA == 0 || motorPinB == 0) {
+    if (!motorEnabled || motorPos == 0 || motorNeg == 0) {
         return;
     }
 
@@ -663,23 +657,23 @@ void motorPWMCycle(uint8_t speed, bool forward) {
     // Software PWM: toggle the active pin HIGH for (speed) portion of cycle
     if (forward) {
         // Forward: PinA HIGH, PinB LOW
-        digitalWrite(motorPinA, HIGH);
-        digitalWrite(motorPinB, LOW);
+        digitalWrite(motorPos, HIGH);
+        digitalWrite(motorNeg, LOW);
         delayMicroseconds(speed * 2); // ON time proportional to speed
 
         // OFF time: both pins LOW
-        digitalWrite(motorPinA, LOW);
-        digitalWrite(motorPinB, LOW);
+        digitalWrite(motorPos, LOW);
+        digitalWrite(motorNeg, LOW);
         delayMicroseconds((255 - speed) * 2); // OFF time
     } else {
         // Reverse: PinA LOW, PinB HIGH
-        digitalWrite(motorPinA, LOW);
-        digitalWrite(motorPinB, HIGH);
+        digitalWrite(motorPos, LOW);
+        digitalWrite(motorNeg, HIGH);
         delayMicroseconds(speed * 2); // ON time proportional to speed
 
         // OFF time: both pins LOW
-        digitalWrite(motorPinA, LOW);
-        digitalWrite(motorPinB, LOW);
+        digitalWrite(motorPos, LOW);
+        digitalWrite(motorNeg, LOW);
         delayMicroseconds((255 - speed) * 2); // OFF time
     }
 }
@@ -688,23 +682,23 @@ void motorPWMCycle(uint8_t speed, bool forward) {
 // Note: Speed control via software PWM doesn't work well for motors on non-PWM pins
 // This now just sets direction and ignores speed parameter
 void motorForwardSpeed(uint8_t speed) {
-    if (!motorEnabled || motorPinA == 0 || motorPinB == 0) {
+    if (!motorEnabled || motorPos == 0 || motorNeg == 0) {
         return;
     }
 
     // For non-PWM pins, just use full digital control
-    digitalWrite(motorPinA, HIGH);
-    digitalWrite(motorPinB, LOW);
+    digitalWrite(motorPos, HIGH);
+    digitalWrite(motorNeg, LOW);
 }
 
 void motorReverseSpeed(uint8_t speed) {
-    if (!motorEnabled || motorPinA == 0 || motorPinB == 0) {
+    if (!motorEnabled || motorPos == 0 || motorNeg == 0) {
         return;
     }
 
     // For non-PWM pins, just use full digital control
-    digitalWrite(motorPinA, LOW);
-    digitalWrite(motorPinB, HIGH);
+    digitalWrite(motorPos, LOW);
+    digitalWrite(motorNeg, HIGH);
 }
 
 // -------------------------------------------------------------------------------------
