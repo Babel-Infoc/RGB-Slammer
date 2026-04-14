@@ -16,21 +16,32 @@ This script is best edited in VSCode for color token selection in swatches.cpp
 // Forward declarations
 void animationPreview();
 
-// Number of LED segments
-const uint8_t numLEDs = 2;
+// Number of directly-driven LED segments (set from active hardware config at boot)
+uint8_t numLEDs = 1;
 
 // Select which hardware configuration to use
-ConfigType activeConfig = AURORA_GLASYA;
+ConfigType activeConfig = NANOFRAME;
 
 // Define the LED array and button pins according to the active configuration
-ledSegment led[2];
+ledSegment led[MAX_LED_SEGMENTS];
 uint8_t colorBtn;
 uint8_t animBtn;
+
+// Shift register pin configuration
+shiftRegPins shiftReg;
+// Initialize with 0 channels by default; will be set from active configuration at boot
+uint8_t numShiftRegChannels = 0;
 
 // Set the default brightness modifier, 0.0 to 0.65 max
 float currentBrightness = 0.4;
 // Temporary brightness value to be used when previewing the new swatch after changing it
 float pulseBrightness = 0.65;
+
+// Per-type output scale — applied after currentBrightness, luminance and gamma correction.
+// Use these to balance perceived brightness between Core GPIO LEDs and SR pod LEDs
+// independently of the global brightness control. Range 0.0 – 1.0.
+float coreOutputScale = 0.7;  // Scale factor for directly-driven GPIO LED segments
+float srOutputScale   = 1.0;  // Scale factor for shift-register LED segments
 
 // Brightness adjustment settings
 const float minBrightness = 0.3;
@@ -45,9 +56,9 @@ const uint8_t slowDown = 1;
 // Define the light intensity of each LED color at the specified mA value
 // Check your LEDs datasheet for typical luminosity values for standard forward current
 // {mA, luminosity}
-const luminance red       = {5, 45};
-const luminance green     = {5, 45};
-const luminance blue      = {5, 55};
+const luminance red       = {5, 180};
+const luminance green     = {5, 450};
+const luminance blue      = {5, 71};
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
@@ -56,16 +67,36 @@ void setup() {
     const PinConfig& config = getActiveConfig(activeConfig);
 
     // Copy pin configuration from the selected hardware profile
-    led[0] = config.leds[0];
-    led[1] = config.leds[1];
+    for (uint8_t i = 0; i < config.numLEDs && i < MAX_LED_SEGMENTS; i++) {
+        led[i] = config.leds[i];
+    }
+    numLEDs  = config.numLEDs;
     colorBtn = config.colorButton;
-    animBtn = config.animButton;
+    animBtn  = config.animButton;
 
-    // Set up all LED segments
-    for (uint8_t segment = 0; segment < 2; segment++) {
-        pinMode(led[segment].red, OUTPUT);
-        pinMode(led[segment].green, OUTPUT);
-        pinMode(led[segment].blue, OUTPUT);
+    // Copy shift register configuration
+    shiftReg            = config.shiftReg;
+    numShiftRegChannels = config.shiftRegChannels;
+
+    // Set up all LED segments (GPIO only — SR segments have no pins to configure)
+    for (uint8_t segment = 0; segment < numLEDs; segment++) {
+        if (!led[segment].isSR) {
+            pinMode(led[segment].red, OUTPUT);
+            pinMode(led[segment].green, OUTPUT);
+            pinMode(led[segment].blue, OUTPUT);
+        }
+    }
+
+    // Set up shift register pins if configured
+    if (numShiftRegChannels > 0) {
+        pinMode(shiftReg.ser,   OUTPUT);
+        pinMode(shiftReg.rclk,  OUTPUT);
+        pinMode(shiftReg.srclk, OUTPUT);
+        // Clear all shift register outputs on startup — 0xFF = all outputs HIGH = all LEDs off (active-LOW wiring)
+        digitalWrite(shiftReg.rclk, LOW);
+        shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
+        shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
+        digitalWrite(shiftReg.rclk, HIGH);
     }
     // Set up the buttons
     pinMode(colorBtn, INPUT_PULLUP);
@@ -82,7 +113,7 @@ void setup() {
     // Try to load saved settings from flash
     if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 23;
+        swNum = 22;
         currentBrightness = 0.4; // Default brightness
         animationMode = 0; // Default to glitchLoop
     }
@@ -115,13 +146,13 @@ void loop() {
             default:
                 glitchLoop(70, 20, 1000);
                 break;
-            // Add more animation modes here as you create them:
-            // case 1:
-            //     smoothPulseLoop();
-            //     break;
-            // case 2:
-            //     strobeLoop();
-            //     break;
+            case 1:
+                // Eye animation: SR pods run their pulse cycle while the core LED holds swatch background.
+                // updateEyeAnimation() writes directly to shiftRegColors[]; the sendToRGB(0,...) call
+                // flushes those values to the shift registers via the GPIO PWM frame.
+                updateEyeAnimation();
+                sendToRGB(0, swatch[swNum].background);
+                break;
         }
     }
 }
@@ -185,9 +216,10 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             }
             currentTime = millis();
         } else {
-            // Normal flicker on both segments
-            flicker(0, flickerChance, 200, 255);
-            flicker(1, flickerChance, 0, 200);
+            // Normal flicker — drive all direct segments
+            for (uint8_t seg = 0; seg < numLEDs; seg++) {
+                flicker(seg, flickerChance, seg == 0 ? 200 : 0, seg == 0 ? 255 : 200);
+            }
             currentTime = millis();
         }
     }
@@ -196,11 +228,11 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
 // -------------------------------------------------------------------------------------
 // MARK: fadeToColor
 void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fadeTime){
-    uint8_t startColor[2][3];
-    uint8_t output[2][3];
+    uint8_t startColor[MAX_LED_SEGMENTS][3];
+    uint8_t output[MAX_LED_SEGMENTS][3];
 
-    // Copy handoverColor to startColor
-    for (int segment = 0; segment < numLEDs; segment++) {
+    // Copy handoverColor to startColor for all segments
+    for (uint8_t segment = 0; segment < numLEDs; segment++) {
         for (int pin = 0; pin < 3; pin++) {
             startColor[segment][pin] = handoverColor[segment][pin];
         }
@@ -214,12 +246,18 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
         }
 
         float fadeRatio = (float)(millis() - startTime) / fadeTime;
-            for (int pin = 0; pin < 3; pin++) {
-                output[0][pin] = startColor[0][pin] + (color1[pin] - startColor[0][pin]) * fadeRatio;
-                output[1][pin] = startColor[1][pin] + (color2[pin] - startColor[1][pin]) * fadeRatio;
+        for (int pin = 0; pin < 3; pin++) {
+            // Segment 0 fades toward color1; all others fade toward color2
+            output[0][pin] = startColor[0][pin] + (color1[pin] - startColor[0][pin]) * fadeRatio;
+            for (uint8_t seg = 1; seg < numLEDs; seg++) {
+                output[seg][pin] = startColor[seg][pin] + (color2[pin] - startColor[seg][pin]) * fadeRatio;
             }
+        }
+        // Update SR segment buffers first, then trigger GPIO PWM + SR clock-out
+        for (uint8_t seg = 1; seg < numLEDs; seg++) {
+            sendToRGB(seg, output[seg]);
+        }
         sendToRGB(0, output[0]);
-        sendToRGB(1, output[1]);
     }
 }
 
@@ -232,8 +270,11 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
         if (swatchPreviewActive) {
             return; // Immediately exit to allow swatch preview to play
         }
+        // Update SR segment buffers first, then trigger GPIO PWM + SR clock-out
+        for (uint8_t seg = 1; seg < numLEDs; seg++) {
+            sendToRGB(seg, color2);
+        }
         sendToRGB(0, color1);
-        sendToRGB(1, color2);
     }
 }
 
@@ -438,8 +479,8 @@ void swatchPreview() {
 
         gradientPosition(gradientPos, outputColor);
 
+        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, outputColor); }
         sendToRGB(0, outputColor);
-        sendToRGB(1, outputColor);
 
         delay(fadeUpDuration / fadeUpSteps);
     }
@@ -451,8 +492,8 @@ void swatchPreview() {
 
         gradientPosition(gradientPos, outputColor);
 
+        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, outputColor); }
         sendToRGB(0, outputColor);
-        sendToRGB(1, outputColor);
 
         delay(fadeDownDuration / fadeDownSteps);
     }
@@ -477,13 +518,13 @@ void animationPreview() {
     // Flash the primary color quickly to indicate animation mode change
     for (int i = 0; i < numFlashes; i++) {
         // Bright flash
+        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, swatch[swNum].primary); }
         sendToRGB(0, swatch[swNum].primary);
-        sendToRGB(1, swatch[swNum].primary);
         delay(flashDuration);
 
         // Dark flash
+        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, swatch[swNum].background); }
         sendToRGB(0, swatch[swNum].background);
-        sendToRGB(1, swatch[swNum].background);
         delay(flashDuration);
     }
 
@@ -492,6 +533,149 @@ void animationPreview() {
 
     // Reset the flag
     animationPreviewActive = false;
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: updateEyeAnimation
+// Non-blocking, millis()-based animation for the 4 SR eye channels.
+// Writes directly to shiftRegColors[]; call this then sendToRGB(0, ...) to flush
+// the updated values to the shift registers via the GPIO PWM frame.
+//
+// Used by animation mode 1 in loop(). For unified animations that drive all
+// segments equally, use the standard animation functions instead (glitchLoop, etc.).
+//
+// Physical layout on the glasses:
+//   Ch0 (shiftRegColors[0])  Ch2 (shiftRegColors[2])  <- top    (Pair A — primary)
+//   Ch1 (shiftRegColors[1])  Ch3 (shiftRegColors[3])  <- bottom (Pair B — accent)
+//
+// Normal cycle: alternating double-pulse per pair with contrast shimmer on idle channels.
+// Random glitch: every 10–20 s, a 2-second blink event fires on a random channel.
+void updateEyeAnimation() {
+
+    // --- Periodic random eye glitch ---
+    // Every 10–20 s, one channel blinks rapidly for 2 s while others shimmer at contrast.
+    static unsigned long nextGlitchTime  = 0;   // 0 = not yet scheduled
+    static unsigned long glitchStartTime = 0;
+    static uint8_t       glitchChannel   = 255; // 255 = no active glitch
+
+    unsigned long now = millis();
+
+    // Schedule first / next glitch when idle
+    if (glitchChannel == 255 && nextGlitchTime == 0) {
+        nextGlitchTime = now + 10000UL + (unsigned long)random(0, 10001);
+    }
+
+    // Fire when the timer expires
+    if (glitchChannel == 255 && now >= nextGlitchTime) {
+        glitchChannel   = (uint8_t)random(0, 4);
+        glitchStartTime = now;
+        nextGlitchTime  = 0; // Reschedule after glitch ends
+    }
+
+    // Render the 2 s glitch event.
+    // The selected channel blinks: 10 ms on (primary) / 40 ms off (contrast) per 50 ms cycle.
+    // A new random channel is chosen on each rising edge.
+    // All other channels shimmer at contrast throughout.
+    if (glitchChannel != 255) {
+        if (now - glitchStartTime < 2000UL) {
+            // Throttled shimmer noise — update at most once per 50 ms
+            static uint8_t       glitchNoise     = 0;
+            static unsigned long lastGlitchNoise = 0;
+            if (now - lastGlitchNoise >= 20UL) {
+                glitchNoise     = (uint8_t)random(0, 22);
+                lastGlitchNoise = now;
+            }
+
+            // 10 ms flash in every 50 ms cycle; pick a new random channel on each rising edge
+            bool flashOn = ((now - glitchStartTime) % 20UL) < 10UL;
+            static bool prevFlashOn = false;
+            if (flashOn && !prevFlashOn) {
+                glitchChannel = (uint8_t)random(0, 4);
+            }
+            prevFlashOn = flashOn;
+
+            for (uint8_t ch = 0; ch < 4; ch++) {
+                const uint8_t* base = swatch[swNum].contrast;
+                if (ch == glitchChannel) {
+                    for (uint8_t c = 0; c < 3; c++)
+                        shiftRegColors[ch][c] = flashOn ? swatch[swNum].primary[c] : base[c];
+                } else {
+                    const uint8_t* color = (ch == 0 || ch == 2) ? swatch[swNum].primary
+                                                                : swatch[swNum].accent;
+                    for (uint8_t c = 0; c < 3; c++)
+                        shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * glitchNoise) / 255);
+                }
+            }
+            return; // Skip normal animation during glitch
+        }
+        glitchChannel = 255; // Glitch complete — reschedule on next call
+    }
+
+    // --- Normal double-pulse cycle ---
+    // Timing constants (milliseconds)
+    const unsigned long P1_UP   =  50UL; // pulse 1 rise  (2× speed)
+    const unsigned long P1_DOWN =  50UL; // pulse 1 fall  (2× speed)
+    const unsigned long IGAP    =  40UL; // rest between pulses (2× speed)
+    const unsigned long P2_UP   =  50UL; // pulse 2 rise
+    const unsigned long P2_DOWN = 450UL; // pulse 2 slow fade out
+    const unsigned long PGAP    = 220UL; // gap between pairs (both at contrast)
+
+    const unsigned long PAIR_MS  = P1_UP + P1_DOWN + IGAP + P2_UP + P2_DOWN;
+    const unsigned long CYCLE_MS = (PAIR_MS + PGAP) * 2;
+
+    unsigned long t = now % CYCLE_MS;
+
+    uint8_t brightness = 0;
+    int8_t  activePair = -1; // -1 = both at contrast, 0 = top row, 1 = bottom row
+
+    // Returns brightness (0-255) for a position within a pair's PAIR_MS slot
+    auto pairBrightness = [&](unsigned long pt) -> uint8_t {
+        if (pt < P1_UP)   return (uint8_t)((pt * 255UL) / P1_UP);
+        pt -= P1_UP;
+        if (pt < P1_DOWN) return (uint8_t)(((P1_DOWN - pt) * 255UL) / P1_DOWN);
+        pt -= P1_DOWN;
+        if (pt < IGAP)    return 0;
+        pt -= IGAP;
+        if (pt < P2_UP)   return (uint8_t)((pt * 255UL) / P2_UP);
+        pt -= P2_UP;
+        return (uint8_t)(((P2_DOWN - pt) * 255UL) / P2_DOWN); // slow fade-out
+    };
+
+    if (t < PAIR_MS) {
+        activePair = 0;
+        brightness = pairBrightness(t);
+    } else if (t < PAIR_MS + PGAP) {
+        activePair = -1;
+    } else if (t < PAIR_MS * 2 + PGAP) {
+        activePair = 1;
+        brightness = pairBrightness(t - (PAIR_MS + PGAP));
+    }
+    // else: second pair gap — activePair stays -1
+
+    // Flicker sample for inactive channels — updated at most once per 50 ms
+    // so the shimmer is visible rather than per-frame noise.
+    static uint8_t       baseFlicker       = 0;
+    static unsigned long lastFlickerSample = 0;
+    if (now - lastFlickerSample >= 50UL) {
+        baseFlicker       = (uint8_t)random(0, 22);
+        lastFlickerSample = now;
+    }
+
+    // ch 0,2 = top row (Pair A) — swatch primary
+    // ch 1,3 = bottom row (Pair B) — swatch accent
+    // Active pair pulses smoothly; idle channels shimmer at contrast floor.
+    for (uint8_t ch = 0; ch < 4; ch++) {
+        bool isPairA         = (ch == 0 || ch == 2);
+        int8_t pairIndex     = isPairA ? 0 : 1;
+        const uint8_t* color = isPairA ? swatch[swNum].primary : swatch[swNum].accent;
+        const uint8_t* base  = swatch[swNum].contrast;
+
+        uint8_t lvl = (activePair == pairIndex) ? brightness : baseFlicker;
+
+        for (uint8_t c = 0; c < 3; c++) {
+            shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * lvl) / 255);
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------
@@ -515,11 +699,11 @@ void brightnessAdjustmentMode() {
         // Map to brightness range
         currentBrightness = minBrightness + (maxBrightness - minBrightness) * brightnessRatio;
 
-        // Display white at current brightness on both segments
-        // Use direct LED control to avoid button checking interference
+        // Display white at current brightness on all segments
+        // SR segments are suppressed automatically by the brightnessAdjustMode check in sendToRGB
         for (int i = 0; i < 10; i++) { // Display multiple times per step for stability
+            for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, whiteColor); }
             sendToRGB(0, whiteColor);
-            sendToRGB(1, whiteColor);
             delay(stepDuration / 10);
         }
     }

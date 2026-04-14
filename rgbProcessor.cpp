@@ -10,9 +10,9 @@ uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
 
-// Animation mode (0 = glitchLoop, 1 = other animations...)
+// Animation mode (0 = glitchLoop, 1 = eye animation, expand as needed)
 uint8_t animationMode = 0;
-const uint8_t numAnimationModes = 1; // Currently only glitchLoop, expand this as you add more
+const uint8_t numAnimationModes = 2;
 
 // Swatch preview animation flag
 bool swatchPreviewActive = false;
@@ -26,10 +26,10 @@ bool buttonHeldFor2Seconds = false;
 
 // Replace std::array with plain C arrays to save significant flash memory
 float tuneRatio[3] = {1.0, 1.0, 1.0};
-uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
+uint8_t handoverColor[MAX_LED_SEGMENTS][3] = {};
 
 // Reference to the led array and buttons defined in the main sketch
-extern ledSegment led[2];
+extern ledSegment led[MAX_LED_SEGMENTS];
 extern uint8_t colorBtn;
 extern uint8_t animBtn;
 extern float currentBrightness;
@@ -129,31 +129,119 @@ void checkButtons() {
 
 // MARK: Light sensor ------------------------------
 
+// MARK: Shift Register Output ------------------------------
+// Reference to shift register globals defined in the main sketch
+extern shiftRegPins shiftReg;
+extern uint8_t numShiftRegChannels;
+
+// Current colors for each shift register channel (up to 4)
+uint8_t shiftRegColors[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+
 // MARK: RGB Processing ------------------------------
-// Function to process the raw RGB values to accurate and consistent luminosity and hue
+// Each sendToRGB call dispatches on segment type:
+//   GPIO segment  — gamma-corrects the colour, runs a full software-PWM frame that drives
+//                    the GPIO pins AND clocks shiftRegColors to all SR channels simultaneously.
+//   SR segment    — buffers the colour into shiftRegColors[]; the buffer is output on the
+//                    next GPIO segment’s PWM frame, keeping all outputs in temporal sync.
+// Call SR segments before the GPIO segment within one animation step for zero lag.
+extern uint8_t numLEDs;
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
-    float rRatio, gRatio, bRatio;
+
+    // Always record this colour as the handover value for transition animations
+    if (segment < numLEDs) {
+        for (uint8_t i = 0; i < 3; i++) {
+            handoverColor[segment][i] = rgbValue[i];
+        }
+    }
+
+    // SR segment: buffer the colour and return early.
+    // It will be clocked out during the next GPIO segment’s PWM frame.
+    if (segment < numLEDs && led[segment].isSR) {
+        uint8_t ch = led[segment].srChannel;
+        for (uint8_t i = 0; i < 3; i++) {
+            shiftRegColors[ch][i] = rgbValue[i];
+        }
+        return;
+    }
+
+    // GPIO segment: run full software-PWM loop ----------------------------------
+
+    // Brightness adjustment mode: suppress SR output — pods show black
+    if (brightnessAdjustMode && numShiftRegChannels > 0) {
+        memset(shiftRegColors, 0, sizeof(shiftRegColors));
+    }
+
+    // Gamma-correct the direct segment colour, then apply per-type output scale
     int tunedRGB[3];
-
-    // Write the end color to the handover color matching the led segment
-    for (int i = 0; i < 3; i++) {
-        handoverColor[segment][i] = rgbValue[i];
-    }
-
-    // Calculate the brightness-adjusted and gamma-corrected values using global tuneRatio
     for (uint8_t pin = 0; pin < 3; pin++) {
-        // Calculate the final RGB value with bounds checking to prevent overflow
         float adjustedValue = rgbValue[pin] * tuneRatio[pin] * currentBrightness;
-        // Constrain to valid gamma table range (0-255)
-        int constrainedValue = constrain((int)adjustedValue, 0, 255);
-        tunedRGB[pin] = pgm_read_byte(&gamma8[constrainedValue]);
+        int   constrained   = constrain((int)adjustedValue, 0, 255);
+        tunedRGB[pin]       = constrain((int)(pgm_read_byte(&gamma8[constrained]) * coreOutputScale), 0, 255);
     }
 
-    // Set the pin states based on the tuned RGB values
+    // Gamma-correct all SR channel colours, then apply per-type output scale
+    uint8_t tunedSR[4][3];
+    if (numShiftRegChannels > 0) {
+        for (uint8_t ch = 0; ch < 4; ch++) {
+            for (uint8_t pin = 0; pin < 3; pin++) {
+                float adjustedValue = shiftRegColors[ch][pin] * tuneRatio[pin] * currentBrightness;
+                int   constrained   = constrain((int)adjustedValue, 0, 255);
+                tunedSR[ch][pin]    = constrain((int)(pgm_read_byte(&gamma8[constrained]) * srOutputScale), 0, 255);
+            }
+        }
+    }
+
+    // Combined software-PWM loop.
+    // Direct segment: active-HIGH (LOW = on).
+    // SR channels:    active-LOW  (HIGH = off) — bytes start 0xFF, bits CLEARED to turn on.
+    // QG/QH of SR1 (BTN1/BTN2) never cleared — remain HIGH at all times.
     for (int brightness = 0; brightness < 100; brightness++) {
-        digitalWrite(led[segment].red, brightness < tunedRGB[0] ?      LOW : HIGH);
-        digitalWrite(led[segment].green, brightness < tunedRGB[1] ?    LOW : HIGH);
-        digitalWrite(led[segment].blue, brightness < tunedRGB[2] ?     LOW : HIGH);
+
+        // Drive direct LED only for valid segments
+        if (segment < numLEDs) {
+            digitalWrite(led[segment].red,   brightness < tunedRGB[0] ? LOW : HIGH);
+            digitalWrite(led[segment].green, brightness < tunedRGB[1] ? LOW : HIGH);
+            digitalWrite(led[segment].blue,  brightness < tunedRGB[2] ? LOW : HIGH);
+        }
+
+        if (numShiftRegChannels > 0) {
+            uint8_t sr1Byte = 0xFF; // U19: bits 0-5 = LEDs, bits 6-7 = BTN1/BTN2 (stay HIGH)
+            uint8_t sr2Byte = 0xFF; // U20: bits 0-5 = LEDs, bits 6-7 unused (stay HIGH)
+
+            // U19 (SR1): Ch2 QA-QC, Ch3 QD-QF
+            if (brightness < tunedSR[0][0]) sr1Byte &= ~(1 << 0); // QA = RED1
+            if (brightness < tunedSR[0][1]) sr1Byte &= ~(1 << 1); // QB = GREEN1
+            if (brightness < tunedSR[0][2]) sr1Byte &= ~(1 << 2); // QC = BLUE1
+            if (brightness < tunedSR[1][0]) sr1Byte &= ~(1 << 3); // QD = RED2
+            if (brightness < tunedSR[1][1]) sr1Byte &= ~(1 << 4); // QE = GREEN2
+            if (brightness < tunedSR[1][2]) sr1Byte &= ~(1 << 5); // QF = BLUE2
+
+            // U20 (SR2): Ch4 QA-QC, Ch5 QD-QF
+            if (brightness < tunedSR[2][0]) sr2Byte &= ~(1 << 0); // QA = RED3
+            if (brightness < tunedSR[2][1]) sr2Byte &= ~(1 << 1); // QB = GREEN3
+            if (brightness < tunedSR[2][2]) sr2Byte &= ~(1 << 2); // QC = BLUE3
+            if (brightness < tunedSR[3][0]) sr2Byte &= ~(1 << 3); // QD = RED4
+            if (brightness < tunedSR[3][1]) sr2Byte &= ~(1 << 4); // QE = GREEN4
+            if (brightness < tunedSR[3][2]) sr2Byte &= ~(1 << 5); // QF = BLUE4
+
+            digitalWrite(shiftReg.rclk, LOW);
+            shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr2Byte); // U20 first
+            shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr1Byte); // U19 second
+            digitalWrite(shiftReg.rclk, HIGH);
+        }
+    }
+
+    // Return all outputs to idle-off after the PWM frame
+    if (segment < numLEDs) {
+        digitalWrite(led[segment].red,   HIGH);
+        digitalWrite(led[segment].green, HIGH);
+        digitalWrite(led[segment].blue,  HIGH);
+    }
+    if (numShiftRegChannels > 0) {
+        digitalWrite(shiftReg.rclk, LOW);
+        shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
+        shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
+        digitalWrite(shiftReg.rclk, HIGH);
     }
 
     // Check buttons once per frame, with debounce handling
