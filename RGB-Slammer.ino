@@ -15,7 +15,15 @@ This script is best edited in VSCode for color token selection in swatches.cpp
 
 // Forward declarations
 void animationPreview();
-void updateEyeGlitch();
+void eyeScatter();
+void eyeDoublePulse();
+void updateGlitchEyes();
+extern void (*srUpdateCallback)(); // defined in rgbProcessor.cpp
+void animation0();
+void animation1();
+void animation2();
+void animation3();
+void animation4();
 
 // Number of directly-driven LED segments (set from active hardware config at boot)
 uint8_t numLEDs = 1;
@@ -33,25 +41,21 @@ shiftRegPins shiftReg;
 // Initialize with 0 channels by default; will be set from active configuration at boot
 uint8_t numShiftRegChannels = 0;
 
-// Set the default brightness modifier, 0.0 to 0.65 max
-float currentBrightness = 0.4;
-// Temporary brightness value to be used when previewing the new swatch after changing it
-float pulseBrightness = 0.65;
+// Brightness stored as 8-bit fixed-point: 0-255 = 0.0-1.0.
+// Default 0.40 → 102; pulse preview 0.65 → 166.
+uint8_t currentBrightness = 100;
+// Temporary brightness value used when previewing a new swatch
+uint8_t pulseBrightness = 200;
 
-// Per-type output scale — applied after currentBrightness, luminance and gamma correction.
-// Use these to balance perceived brightness between Core GPIO LEDs and SR pod LEDs
-// independently of the global brightness control. Range 0.0 – 1.0.
-float coreOutputScale = 0.7;  // Scale factor for directly-driven GPIO LED segments
-float srOutputScale   = 1.0;  // Scale factor for shift-register LED segments
+// Individual section brightness adjustment
+uint8_t coreOutputScale = 100;
+uint8_t srOutputScale   = 255;
 
-// Brightness adjustment settings
-const float minBrightness = 0.3;
-const float maxBrightness = 0.6;
+// Brightness adjustment mode limits (0-255 fixed-point: 0.30→77, 0.60→153)
+const uint8_t minBrightness = 77;
+const uint8_t maxBrightness = 153;
 const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
 bool brightnessAdjustMode = false;
-// Set by glitchLoop so showColor/fadeToColor route SR eye pod output through
-// updateEyeGlitch() instead of using their passed eye colour argument.
-bool glitchEyeActive = false;
 
 // Slow down all animations by this amou nt (in milliseconds)
 const uint8_t slowDown = 1;
@@ -60,9 +64,9 @@ const uint8_t slowDown = 1;
 // Define the light intensity of each LED color at the specified mA value
 // Check your LEDs datasheet for typical luminosity values for standard forward current
 // {mA, luminosity}
-const luminance red       = {5, 180};
-const luminance green     = {5, 450};
-const luminance blue      = {5, 71};
+const luminance red       = {5, 100};
+const luminance green     = {5, 100};
+const luminance blue      = {5, 100};
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
@@ -109,18 +113,15 @@ void setup() {
     // Calculate the luminosity modifiers
     calculateLuminance();
 
-    // Set up random seeds
-    float randSeed1(analogRead(0));
-    float randSeed2(analogRead(1));
-
-
     // Try to load saved settings from flash
     if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 0;
-        currentBrightness = 0.4; // Default brightness
-        animationMode = 0; // Default to glitchLoop
+        swNum = 5;
+        animationMode = 0;
     }
+
+    // Set default SR animation — runs on every Core sendToRGB flush until overridden.
+    srUpdateCallback = eyeDoublePulse;
 
     // Show the bootup animation
     bounceBoot(40);
@@ -129,7 +130,7 @@ void setup() {
 /*=======================================================================================
 // MARK:                                Main loop                                      //
 =======================================================================================*/
-// Only runs the glitchLoop animation
+// Dispatches animation modes; glitchLoop drives Core and SR channels in the same frame.
 
 void loop() {
     // Check if brightness adjustment mode should be active
@@ -148,23 +149,19 @@ void loop() {
         switch (animationMode) {
             case 0:
             default:
-                glitchLoop(70, 20, 1000);
-                updateEyeAnimation();
-                sendToRGB(0, swatch[swNum].background);
+                glitchLoop(70, 100, 15, 1000);
                 break;
             case 1:
-                // Eye animation: SR pods run their pulse cycle while the core LED holds swatch background.
-                // updateEyeAnimation() writes directly to shiftRegColors[]; the sendToRGB(0,...) call
-                // flushes those values to the shift registers via the GPIO PWM frame.
-                updateEyeAnimation();
-                sendToRGB(0, swatch[swNum].background);
+                glitchLoop(70, 100, 15, 1000);
                 break;
             case 2:
-                // Mirror eye animation: left/right eye pods pulse in-phase or anti-phase
-                // while the core LED holds swatch background.
-                // updateEyeAnimation() handles both modes via the global animationMode.
-                updateEyeAnimation();
-                sendToRGB(0, swatch[swNum].background);
+                glitchLoop(70, 100, 15, 1000);
+                break;
+            case 3:
+                glitchLoop(70, 100, 15, 1000);
+                break;
+            case 4:
+                glitchLoop(70, 100, 15, 1000);
                 break;
         }
     }
@@ -191,30 +188,27 @@ void bounceBoot(int speed){
 
 // -------------------------------------------------------------------------------------
 // MARK: glitchLoop
-// Advanced neon flicker with 3 different animation patterns selected randomly.
-// Sets glitchEyeActive while running so showColor/fadeToColor route SR eye output
-// through updateEyeGlitch() instead of using their passed eye colour argument.
-void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const int duration) {
-    // For <duration> milliseconds, both LED segments will either play a special animation or the normal flicker
+// Per-frame dual-channel loop: SR and Core values are calculated each iteration then
+// flushed atomically via the SR-first pattern (SR written before sendToRGB flushes both).
+// SR channel:   probability roll → eyeScatter or eyeDoublePulse, writes shiftRegColors[].
+// Core channel: probability roll → blocking glitch effect or default flicker (flush point).
+void glitchLoop(const uint8_t flickerChance, const uint8_t coreEffectChance, const uint8_t srEffectChance, const int duration) {
     unsigned long startTime = millis();
     unsigned long currentTime = millis();
-    bool effectTrigger = random(0, 100) < effectChance;
-    glitchEyeActive = true;
     while (currentTime - startTime < duration) {
         // Check if swatch preview should interrupt this animation
         if (swatchPreviewActive) {
-            glitchEyeActive = false;
             return; // Immediately exit to allow swatch preview to play
         }
 
-        if (effectTrigger) {
-            // Apply a special effect — restricted to ROLE_CORE segments only
+        // SR channel: register the SR function for this iteration.
+        // sendToRGB will call it automatically before each Core flush (including inside glitch effects).
+        srUpdateCallback = (random(0, 100) < srEffectChance) ? eyeScatter : eyeDoublePulse;
+
+        // Core channel: probability roll selects a blocking glitch effect or the default flicker.
+        if (random(0, 100) < coreEffectChance) {
             uint8_t flickerSegment = 0;
             for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_CORE) { flickerSegment = s; break; } }
-            // Pre-seed eye glitch state. Effects using showColor/fadeToColor advance it each frame;
-            // glitch4 (which skips those calls) has its own internal updateEyeGlitch() call.
-            updateEyeGlitch();
-            // Pick a random glitch effect
             switch (random(0, 6)) {
                 case 0:
                     glitch1(flickerSegment, 700);
@@ -237,22 +231,22 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             }
             currentTime = millis();
         } else {
-            // Normal flicker — core LED flickers; eye pods run the double-pulse animation.
-            // updateEyeAnimation() writes to shiftRegColors[], then flicker() flushes it via sendToRGB(core).
+            // Default: flicker()'s sendToRGB flushes shiftRegColors[] and Core simultaneously.
             for (uint8_t seg = 0; seg < numLEDs; seg++) {
                 if (led[seg].role == ROLE_CORE) {
-                    updateEyeAnimation();
                     flicker(seg, flickerChance, 200, 255);
                 }
             }
             currentTime = millis();
         }
     }
-    glitchEyeActive = false;
 }
 
 // -------------------------------------------------------------------------------------
 // MARK: fadeToColor
+// color1 → ROLE_CORE segments, color2 → ROLE_EXT segments.
+// If srUpdateCallback is set, it runs during the ROLE_CORE flush and overrides color2 for SR.
+// Set srUpdateCallback = nullptr before calling to drive ROLE_EXT directly with color2.
 void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fadeTime){
     uint8_t startColor[MAX_LED_SEGMENTS][3];
     uint8_t output[MAX_LED_SEGMENTS][3];
@@ -271,21 +265,18 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
             return; // Immediately exit to allow swatch preview to play
         }
 
-        float fadeRatio = (float)(millis() - startTime) / fadeTime;
+        uint8_t fadeRatio = (uint8_t)(((unsigned long)(millis() - startTime) * 255UL) / (unsigned long)fadeTime);
         for (int pin = 0; pin < 3; pin++) {
             for (uint8_t seg = 0; seg < numLEDs; seg++) {
                 const uint8_t* target = (led[seg].role == ROLE_CORE) ? color1 : color2;
-                output[seg][pin] = startColor[seg][pin] + (target[pin] - startColor[seg][pin]) * fadeRatio;
+                int16_t delta = (int16_t)target[pin] - (int16_t)startColor[seg][pin];
+                output[seg][pin] = (uint8_t)((int16_t)startColor[seg][pin] + (int16_t)(((int32_t)delta * fadeRatio) >> 8));
             }
         }
-        // Eye segments: if glitch eye mode is active, advance the independent eye animation;
-        // otherwise interpolate towards the explicit eye colour passed to this function.
-        if (glitchEyeActive) {
-            updateEyeGlitch();
-        } else {
-            for (uint8_t seg = 0; seg < numLEDs; seg++) {
-                if (led[seg].role == ROLE_EYE) sendToRGB(seg, output[seg]);
-            }
+        // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
+        // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
+        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            if (led[seg].role == ROLE_EXT) sendToRGB(seg, output[seg]);
         }
         for (uint8_t seg = 0; seg < numLEDs; seg++) {
             if (led[seg].role == ROLE_CORE) sendToRGB(seg, output[seg]);
@@ -295,6 +286,9 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 
 // -------------------------------------------------------------------------------------
 // MARK: showColor
+// color1 → ROLE_CORE segments, color2 → ROLE_EXT segments.
+// If srUpdateCallback is set, it runs during the ROLE_CORE flush and overrides color2 for SR.
+// Set srUpdateCallback = nullptr before calling to drive ROLE_EXT directly with color2.
 void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
     unsigned long startTime = millis();
     while (millis() - startTime < duration) {
@@ -302,14 +296,10 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
         if (swatchPreviewActive) {
             return; // Immediately exit to allow swatch preview to play
         }
-        // Eye segments: if glitch eye mode is active, advance the independent eye animation;
-        // otherwise write the explicit eye colour passed to this function.
-        if (glitchEyeActive) {
-            updateEyeGlitch();
-        } else {
-            for (uint8_t seg = 0; seg < numLEDs; seg++) {
-                if (led[seg].role == ROLE_EYE) sendToRGB(seg, color2);
-            }
+        // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
+        // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
+        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            if (led[seg].role == ROLE_EXT) sendToRGB(seg, color2);
         }
         for (uint8_t seg = 0; seg < numLEDs; seg++) {
             if (led[seg].role == ROLE_CORE) sendToRGB(seg, color1);
@@ -319,11 +309,23 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
 
 // -------------------------------------------------------------------------------------
 // MARK: flicker
+// Works for any segment role. If pin is an SR segment, suppresses srUpdateCallback
+// and triggers a ROLE_CORE flush so the buffered SR color is output immediately.
 void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const uint8_t max){
     uint8_t outputColor[3];
     uint8_t range = random(min, max);
     gradientPosition(range, outputColor);
     sendToRGB(pin, outputColor);
+    // SR segments buffer only — need a GPIO flush to output. Suppress callback so
+    // hand-written SR color is not overwritten, then flush via the ROLE_CORE segment.
+    if (pin < numLEDs && led[pin].isSR) {
+        void (*saved)() = srUpdateCallback;
+        srUpdateCallback = nullptr;
+        for (uint8_t s = 0; s < numLEDs; s++) {
+            if (!led[s].isSR) { sendToRGB(s, handoverColor[s]); break; }
+        }
+        srUpdateCallback = saved;
+    }
 }
 
 // -------------------------------------------------------------------------------------
@@ -378,7 +380,7 @@ void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     // Find a representative segment of the opposite role for handover reference
     uint8_t otherSegment = 0;
     if (led[segment].role == ROLE_CORE) {
-        for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_EYE)  { otherSegment = s; break; } }
+        for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_EXT)  { otherSegment = s; break; } }
     } else {
         for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_CORE) { otherSegment = s; break; } }
     }
@@ -411,9 +413,8 @@ void glitch4(uint8_t reps, int duration) {
         }
 
         for (uint8_t segment = 0; segment < numLEDs; segment++) {
-            if (led[segment].role == ROLE_EYE) continue;
+            if (led[segment].role == ROLE_EXT) continue;
             gradientPosition(random(1, 255), color);
-            if (glitchEyeActive) updateEyeGlitch(); // advance eye animation for each new gradient position
             for (uint8_t i = 0; i < reps; i++) {
                 sendToRGB(segment, color);
                 sendToRGB(segment, swatch[swNum].contrast);
@@ -507,18 +508,18 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
 // -------------------------------------------------------------------------------------
 // MARK: swatchPreview
 void swatchPreview() {
-    const int fadeUpDuration = 50; // 0.2 seconds fade up
-    const int fadeDownDuration = 400; // 0.6 seconds fade down
-    const int fadeUpSteps = 20; // Steps for fade up
-    const int fadeDownSteps = 60; // Steps for fade down
+    const uint8_t fadeUpDuration = 50; // 0.2 seconds fade up
+    const uint8_t fadeDownDuration = 400; // 0.6 seconds fade down
+    const uint8_t fadeUpSteps = 20; // Steps for fade up
+    const uint8_t fadeDownSteps = 60; // Steps for fade down
 
     // Store original brightness and temporarily increase it
-    float originalBrightness = currentBrightness;
+    uint8_t originalBrightness = currentBrightness;
     currentBrightness = pulseBrightness;
 
     // Phase 1: Fade UP quickly from dark to bright over 0.2 seconds
-    for (int i = 0; i < fadeUpSteps; i++) {
-        uint8_t gradientPos = (i * 255) / (fadeUpSteps - 1); // Start at 0 (bright), go to 255 (dark)
+    for (uint8_t i = 0; i < fadeUpSteps; i++) {
+        uint8_t gradientPos = (i * 255) / (fadeUpSteps - 1);
         uint8_t outputColor[3];
 
         gradientPosition(gradientPos, outputColor);
@@ -530,7 +531,7 @@ void swatchPreview() {
     }
 
     // Phase 2: Fade DOWN slowly from bright to dark over 0.6 seconds
-    for (int i = 0; i < fadeDownSteps; i++) {
+    for (uint8_t i = 0; i < fadeDownSteps; i++) {
         uint8_t gradientPos = ((fadeDownSteps - 1 - i) * 255) / (fadeDownSteps - 1); // Start at 255 (dark), go to 0 (bright)
         uint8_t outputColor[3];
 
@@ -552,15 +553,15 @@ void swatchPreview() {
 // -------------------------------------------------------------------------------------
 // MARK: animationPreview
 void animationPreview() {
-    const int flashDuration = 100; // Quick flash duration in ms
-    const int numFlashes = 3; // Number of flashes to indicate mode change
+    const uint8_t flashDuration = 100; // Quick flash duration in ms
+    const uint8_t numFlashes = 3; // Number of flashes to indicate mode change
 
     // Store original brightness and temporarily increase it
-    float originalBrightness = currentBrightness;
+    uint8_t originalBrightness = currentBrightness;
     currentBrightness = pulseBrightness;
 
     // Flash the primary color quickly to indicate animation mode change
-    for (int i = 0; i < numFlashes; i++) {
+    for (uint8_t i = 0; i < numFlashes; i++) {
         // Bright flash
         for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, swatch[swNum].primary); }
         sendToRGB(0, swatch[swNum].primary);
@@ -581,7 +582,7 @@ void animationPreview() {
 
 // -------------------------------------------------------------------------------------
 // MARK: calcPulseLevel
-// Shared double-pulse brightness envelope used by updateEyeAnimation (both modes).
+// Shared double-pulse brightness envelope used by eyeDoublePulse (both modes).
 // pt = milliseconds into the 570 ms pulse window. Returns 0–255.
 // Pulse shape: P1 rise 50 ms, P1 fall 70 ms, P2 rise 50 ms, P2 slow fall 400 ms.
 static uint8_t calcPulseLevel(unsigned long pt) {
@@ -596,14 +597,14 @@ static uint8_t calcPulseLevel(unsigned long pt) {
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: updateEyeAnimation
+// MARK: eyeDoublePulse
 // Non-blocking, millis()-based pulse animation for the 4 SR eye channels.
 // Reads animationMode to select sub-mode:
 //   mode 1 — Pair:   ch0/ch2 (SR1/SR3) fire first, then ch1/ch3 (SR2/SR4).
 //   mode 2 — Mirror: left eye (ch0/ch1) vs right eye (ch2/ch3), cycling between
 //             in-phase and anti-phase every 3 s.
 // Writes directly to shiftRegColors[]; call this then sendToRGB(0, ...) to flush.
-void updateEyeAnimation() {
+void eyeDoublePulse() {
     const bool mirrorMode = (animationMode == 2);
 
     static uint8_t       baseFlicker       = 0;
@@ -664,13 +665,11 @@ void updateEyeAnimation() {
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: updateEyeGlitch
+// MARK: eyeScatter
 // Non-blocking independent glitch animation for SR eye pod channels.
 // Each of the 4 SR channels has its own per-channel timer and independently picks random
-// swatch colours and brightness levels — a simultaneous but decoupled animation from
-// the core LED. Safe to call multiple times per PWM frame; per-channel timers prevent
-// over-advancing state. Writes directly to shiftRegColors[]; does not call sendToRGB.
-void updateEyeGlitch() {
+// swatch colours and brightness levels.
+void eyeScatter() {
     static uint8_t       colorSlot[4]  = {3, 0, 1, 2};
     static uint8_t       level[4]      = {80, 60, 120, 40};
     static unsigned long nextChange[4] = {0, 0, 0, 0};
@@ -713,6 +712,32 @@ void updateEyeGlitch() {
 }
 
 // -------------------------------------------------------------------------------------
+// MARK: updateGlitchEyes
+// Non-blocking SR eye pod dispatcher. Two states:
+//   0 = eyeDoublePulse (default fallback — always runs between scatter events)
+//   1 = eyeScatter     (triggered effect — ~30% chance at each transition)
+// Probability is rolled at each state transition; no hold/dark-pause state.
+// Called from showColor, fadeToColor, glitch4 (when glitchEyeActive), and glitchLoop's main loop.
+void updateGlitchEyes() {
+    static uint8_t       eyeEffect   = 0;  // start on doublePulse
+    static unsigned long eyeChangeAt = 0;
+    unsigned long now = millis();
+    if (now >= eyeChangeAt) {
+        if (random(0, 100) < 30) {
+            eyeEffect   = 1; // eyeScatter — short window
+            eyeChangeAt = now + (unsigned long)random(300, 900);
+        } else {
+            eyeEffect   = 0; // eyeDoublePulse — longer window
+            eyeChangeAt = now + (unsigned long)random(800, 2400);
+        }
+    }
+    switch (eyeEffect) {
+        case 1: eyeScatter();      break;  // SR scatter effect
+        default: eyeDoublePulse(); break;  // eyeDoublePulse fallback (always)
+    }
+}
+
+// -------------------------------------------------------------------------------------
 // MARK: brightnessAdjustmentMode
 void brightnessAdjustmentMode() {
     const int cycleDuration = 4000; // 4 seconds total
@@ -726,12 +751,13 @@ void brightnessAdjustmentMode() {
     while (brightnessAdjustMode && digitalRead(colorBtn) == LOW) {
         unsigned long elapsedTime = millis() - modeStartTime;
 
-        // Simple triangle wave for brightness cycling
-        float cyclePos = (float)(elapsedTime % cycleDuration) / cycleDuration;
-        float brightnessRatio = (cyclePos < 0.5) ? cyclePos * 2 : 2 - (cyclePos * 2);
-
+        // Simple triangle wave for brightness cycling (integer fixed-point)
+        uint32_t phase = elapsedTime % (uint32_t)cycleDuration;
+        uint8_t  ratio = (phase < (uint32_t)(cycleDuration / 2))
+                         ? (uint8_t)(phase * 255UL / (uint32_t)(cycleDuration / 2))
+                         : (uint8_t)(((uint32_t)cycleDuration - phase) * 255UL / (uint32_t)(cycleDuration / 2));
         // Map to brightness range
-        currentBrightness = minBrightness + (maxBrightness - minBrightness) * brightnessRatio;
+        currentBrightness = minBrightness + (uint8_t)(((uint16_t)(maxBrightness - minBrightness) * ratio) >> 8);
 
         // Display white at current brightness on all segments
         // SR segments are suppressed automatically by the brightnessAdjustMode check in sendToRGB
@@ -741,7 +767,6 @@ void brightnessAdjustmentMode() {
             delay(stepDuration / 10);
         }
     }
-
     // Reset mode flag
     brightnessAdjustMode = false;
 }

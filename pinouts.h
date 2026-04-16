@@ -39,10 +39,10 @@ struct PinConfig {
 const PinConfig NANOFRAME_PINOUT = {
     .leds = {
         {PC1, PC2, PC3, false, 0, ROLE_CORE}, // Seg 0: Core LED (direct GPIO)
-        {0,   0,   0,   true,  0, ROLE_EYE},  // Seg 1: SR ch0 — eye top-left
-        {0,   0,   0,   true,  1, ROLE_EYE},  // Seg 2: SR ch1 — eye bottom-left
-        {0,   0,   0,   true,  2, ROLE_EYE},  // Seg 3: SR ch2 — eye top-right
-        {0,   0,   0,   true,  3, ROLE_EYE},  // Seg 4: SR ch3 — eye bottom-right
+        {0,   0,   0,   true,  0, ROLE_EXT},  // Seg 1: SR ch0 — eye top-left
+        {0,   0,   0,   true,  1, ROLE_EXT},  // Seg 2: SR ch1 — eye bottom-left
+        {0,   0,   0,   true,  2, ROLE_EXT},  // Seg 3: SR ch2 — eye top-right
+        {0,   0,   0,   true,  3, ROLE_EXT},  // Seg 4: SR ch3 — eye bottom-right
     },
     .numLEDs = 5,
     .shiftReg    = {PD4, PD3, PD2}, // SER, RCLK, SRCLK

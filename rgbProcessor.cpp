@@ -12,7 +12,7 @@ uint8_t debounceStart = 0;
 
 // Animation mode (0 = glitchLoop, 1 = eye animation, expand as needed)
 uint8_t animationMode = 0;
-const uint8_t numAnimationModes = 3;
+const uint8_t numAnimationModes = 5;
 
 // Swatch preview animation flag
 bool swatchPreviewActive = false;
@@ -24,15 +24,14 @@ bool animationPreviewActive = false;
 unsigned long buttonPressStartTime = 0;
 bool buttonHeldFor2Seconds = false;
 
-// Replace std::array with plain C arrays to save significant flash memory
-float tuneRatio[3] = {1.0, 1.0, 1.0};
+uint8_t tuneRatio[3] = {255, 255, 255};
 uint8_t handoverColor[MAX_LED_SEGMENTS][3] = {};
 
 // Reference to the led array and buttons defined in the main sketch
 extern ledSegment led[MAX_LED_SEGMENTS];
 extern uint8_t colorBtn;
 extern uint8_t animBtn;
-extern float currentBrightness;
+extern uint8_t currentBrightness;
 
 // MARK: Gamma Correction ------------------------------
 const uint8_t PROGMEM gamma8[] = {
@@ -55,21 +54,20 @@ const uint8_t PROGMEM gamma8[] = {
   252,255 };
 
 // MARK: Luminance Calculation ------------------------------
-// Function to calculate luminance ratios for consistent color output
 void calculateLuminance() {
     // Calculate the effective luminance per mA for each LED
-    float rEfficiency = red.luminance / red.mA;
-    float gEfficiency = green.luminance / green.mA;
-    float bEfficiency = blue.luminance / blue.mA;
+    uint8_t rEfficiency = red.luminance / red.mA;
+    uint8_t gEfficiency = green.luminance / green.mA;
+    uint8_t bEfficiency = blue.luminance / blue.mA;
 
     // Find the most efficient LED (highest luminance per mA)
-    float maxEfficiency = max(rEfficiency, max(gEfficiency, bEfficiency));
+    uint8_t maxEfficiency = max(rEfficiency, max(gEfficiency, bEfficiency));
 
     // Scale all LEDs DOWN from the most efficient one
     // This ensures no LED is driven above its baseline
-    tuneRatio[0] = rEfficiency / maxEfficiency; // Red ratio (≤ 1.0)
-    tuneRatio[1] = gEfficiency / maxEfficiency; // Green ratio (≤ 1.0)
-    tuneRatio[2] = bEfficiency / maxEfficiency; // Blue ratio (≤ 1.0)
+    tuneRatio[0] = (uint8_t)((rEfficiency / maxEfficiency) * 255);
+    tuneRatio[1] = (uint8_t)((gEfficiency / maxEfficiency) * 255);
+    tuneRatio[2] = (uint8_t)((bEfficiency / maxEfficiency) * 255);
 }
 
 // MARK: Button Handling ------------------------------
@@ -137,10 +135,16 @@ extern uint8_t numShiftRegChannels;
 // Current colors for each shift register channel (up to 4)
 uint8_t shiftRegColors[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
 
+// SR update callback — called by sendToRGB before every GPIO (Core) PWM flush.
+// Set from the animation loop to eyeDoublePulse, eyeScatter, or any other function
+// that writes shiftRegColors[]. nullptr = no update; SR holds its previous state.
+void (*srUpdateCallback)() = nullptr;
+
 // MARK: RGB Processing ------------------------------
 // Each sendToRGB call dispatches on segment type:
-//   GPIO segment  — gamma-corrects the colour, runs a full software-PWM frame that drives
-//                    the GPIO pins AND clocks shiftRegColors to all SR channels simultaneously.
+//   GPIO segment  — invokes srUpdateCallback to update shiftRegColors[], then gamma-corrects
+//                    all colours and runs a full software-PWM frame driving GPIO pins AND
+//                    clocking all SR channels simultaneously.
 //   SR segment    — buffers the colour into shiftRegColors[]; the buffer is output on the
 //                    next GPIO segment’s PWM frame, keeping all outputs in temporal sync.
 // Call SR segments before the GPIO segment within one animation step for zero lag.
@@ -166,27 +170,31 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // GPIO segment: run full software-PWM loop ----------------------------------
 
+    // Let the registered SR callback update shiftRegColors[] for this frame.
+    if (srUpdateCallback) srUpdateCallback();
+
     // Brightness adjustment mode: suppress SR output — pods show black
     if (brightnessAdjustMode && numShiftRegChannels > 0) {
         memset(shiftRegColors, 0, sizeof(shiftRegColors));
     }
 
-    // Gamma-correct the direct segment colour, then apply per-type output scale
-    int tunedRGB[3];
+    // Gamma-correct the direct segment colour, then apply per-type output scale.
+    // 8-bit fixed-point scaling: scaled = (a * b) >> 8  (0-255 × 0-255 → 0-255).
+    uint8_t tunedRGB[3];
     for (uint8_t pin = 0; pin < 3; pin++) {
-        float adjustedValue = rgbValue[pin] * tuneRatio[pin] * currentBrightness;
-        int   constrained   = constrain((int)adjustedValue, 0, 255);
-        tunedRGB[pin]       = constrain((int)(pgm_read_byte(&gamma8[constrained]) * coreOutputScale), 0, 255);
+        uint8_t adj   = (uint8_t)(((uint16_t)rgbValue[pin]               * tuneRatio[pin])    >> 8);
+        adj           = (uint8_t)(((uint16_t)adj                         * currentBrightness) >> 8);
+        tunedRGB[pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * coreOutputScale)   >> 8);
     }
 
-    // Gamma-correct all SR channel colours, then apply per-type output scale
+    // Gamma-correct all SR channel colours, then apply per-type output scale.
     uint8_t tunedSR[4][3];
     if (numShiftRegChannels > 0) {
         for (uint8_t ch = 0; ch < 4; ch++) {
             for (uint8_t pin = 0; pin < 3; pin++) {
-                float adjustedValue = shiftRegColors[ch][pin] * tuneRatio[pin] * currentBrightness;
-                int   constrained   = constrain((int)adjustedValue, 0, 255);
-                tunedSR[ch][pin]    = constrain((int)(pgm_read_byte(&gamma8[constrained]) * srOutputScale), 0, 255);
+                uint8_t adj      = (uint8_t)(((uint16_t)shiftRegColors[ch][pin] * tuneRatio[pin])    >> 8);
+                adj              = (uint8_t)(((uint16_t)adj                     * currentBrightness) >> 8);
+                tunedSR[ch][pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * srOutputScale) >> 8);
             }
         }
     }
@@ -252,7 +260,7 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
 // MARK: Role-based output ------------------------------
 // Convenience wrapper: calls sendToRGB for every segment whose role matches.
-// For correct SR/GPIO ordering the caller should invoke ROLE_EYE first (SR buffer),
+// For correct SR/GPIO ordering the caller should invoke ROLE_EXT first (SR buffer),
 // then ROLE_CORE (triggers the PWM frame that flushes the SR buffer).
 void sendToRole(uint8_t role, const uint8_t color[3]) {
     for (uint8_t seg = 0; seg < numLEDs; seg++) {

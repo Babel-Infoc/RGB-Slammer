@@ -8,16 +8,16 @@
 // MARK: ------------------------------ Hardware structure definitions ------------------------------
 // LED segment role — determines which animation colour target a segment belongs to
 #define ROLE_CORE 0   // Directly-driven GPIO LED (core)
-#define ROLE_EYE  1   // Shift-register eye pod
+#define ROLE_EXT  1   // Shift-register eye pod
 
 // Struct for LED segment definition
 struct ledSegment {
-    int red;
-    int green;
-    int blue;
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
     bool    isSR;      // true = driven via shift register, false = direct GPIO
     uint8_t srChannel; // shift register channel index (ignored when isSR = false)
-    uint8_t role;      // ROLE_CORE or ROLE_EYE
+    uint8_t role;      // ROLE_CORE or ROLE_EXT
 };
 
 // Struct for shift register pin configuration
@@ -45,11 +45,11 @@ struct luminance {
     uint8_t luminance;
 };
 
-// Brightness and luminance globals
-extern float currentBrightness;
-extern float pulseBrightness;
-extern float coreOutputScale; // Post-gamma output scale for GPIO segments
-extern float srOutputScale;   // Post-gamma output scale for SR segments
+// Brightness and luminance globals — 8-bit fixed-point: 0-255 represents 0.0-1.0
+extern uint8_t currentBrightness;
+extern uint8_t pulseBrightness;
+extern uint8_t coreOutputScale; // Post-gamma output scale for GPIO segments (0-255)
+extern uint8_t srOutputScale;   // Post-gamma output scale for SR segments (0-255)
 extern const luminance red;
 extern const luminance green;
 extern const luminance blue;
@@ -87,7 +87,7 @@ extern uint8_t shiftRegColors[4][3];
 void calculateLuminance();
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);
 void sendToRole(uint8_t role, const uint8_t color[3]);
-void updateEyeAnimation();
+void eyeDoublePulse();
 void swatchPreview();
 void animationPreview();
 void brightnessAdjustmentMode();

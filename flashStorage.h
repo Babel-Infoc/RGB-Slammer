@@ -14,7 +14,7 @@ typedef struct {
 } __attribute__((aligned(4))) FlashSettings;
 
 // Function prototypes
-bool loadSettingsFromFlash(uint8_t* swatchNum, float* brightness, uint8_t* animationMode);
-bool saveSettingsToFlash(uint8_t swatchNum, float brightness, uint8_t animationMode);
+bool loadSettingsFromFlash(uint8_t* swatchNum, uint8_t* brightness, uint8_t* animationMode);
+bool saveSettingsToFlash(uint8_t swatchNum, uint8_t brightness, uint8_t animationMode);
 
 #endif // FLASH_STORAGE_H

@@ -18,77 +18,77 @@ uint8_t swNum = 0;
 // Master array of swatches
 swatchArray swatch[] = {
     {
-        // Hazard pay
+        // 0 Hazard pay
         rgba(255,   200,    0,      1),
         rgba(255,   150,    0,      1),
         rgba(200,   100,    0,      1),
         rgba(100,   50,     0,      1),
         rgba(50,    0,      0,      1),
     },{
-        // Red mist
+        // 1 Red mist
         rgba(255,   150,    150,    1),
         rgba(255,   0,      150,    1),
         rgba(200,   0,      100,    1),
         rgba(150,   0,      50,     1),
         rgba(0,     0,      0,      1),
     },{
-        // Arasaka
+        // 2 Arasaka
         rgba(255,   0,      0,      1),
         rgba(200,   0,      0,      1),
         rgba(150,   0,      0,      1),
         rgba(100,   0,      0,      1),
         rgba(0,     0,      0,      1),
     },{
-        // Acid spill
+        // 3 Acid spill
         rgba(0,     255,    200,    1),
         rgba(0,     255,    150,    1),
         rgba(0,     200,    100,    1),
         rgba(0,     100,    50,     1),
         rgba(0,     0,      0,      1),
     },{
-        // Mox
+        // 4 Mox
         rgba(150,   255,    150,    1),
         rgba(150,   255,    0,      1),
         rgba(100,   200,    0,      1),
         rgba(50,    150,    0,      1),
         rgba(0,     0,      0,      1),
     },{
-        // Static romance
+        // 5 Static romance
         rgba(200,   0,      255,    1),
         rgba(150,   0,      255,    1),
         rgba(100,   0,      200,    1),
         rgba(50,    0,      100,    1),
         rgba(0,     0,      0,      1),
     },{
-        // Corpo
+        // 6 Corpo
         rgba(150,   150,    255,    1),
         rgba(0,     150,    255,    1),
         rgba(0,     100,    200,    1),
         rgba(0,     50,     150,    1),
         rgba(0,     0,      0,      1),
     },{
-        // Radioactive
+        // 7 Radioactive
         rgba(255,   255,    150,    1),
         rgba(255,   255,    0,      1),
         rgba(200,   250,    0,      1),
         rgba(120,   100,    0,      1),
         rgba(100,   50,     0,      1),
     },{
-        // Brandi
+        // 8 Brandi
         rgba(255,   0,      255,    1),
         rgba(200,   0,      200,    1),
         rgba(150,   0,      150,    1),
         rgba(100,   0,      100,    1),
         rgba(50,    0,      50,     1),
     },{
-        // Wintermute
+        // 9 Wintermute
         rgba(0,   255,      255,    1),
         rgba(0,   200,      200,    1),
         rgba(0,   150,      150,    1),
         rgba(0,   100,      100,    1),
         rgba(0,    50,      50,     1),
     },{
-        // Mono
+        // 10 Mono
         rgba(255,   255,    255,    1),
         rgba(200,   200,    200,    1),
         rgba(150,   150,    150,    1),
