@@ -6,6 +6,10 @@
 #define MAX_LED_SEGMENTS 5
 
 // MARK: ------------------------------ Hardware structure definitions ------------------------------
+// LED segment role — determines which animation colour target a segment belongs to
+#define ROLE_CORE 0   // Directly-driven GPIO LED (core)
+#define ROLE_EYE  1   // Shift-register eye pod
+
 // Struct for LED segment definition
 struct ledSegment {
     int red;
@@ -13,6 +17,7 @@ struct ledSegment {
     int blue;
     bool    isSR;      // true = driven via shift register, false = direct GPIO
     uint8_t srChannel; // shift register channel index (ignored when isSR = false)
+    uint8_t role;      // ROLE_CORE or ROLE_EYE
 };
 
 // Struct for shift register pin configuration
@@ -81,6 +86,7 @@ extern uint8_t shiftRegColors[4][3];
 
 void calculateLuminance();
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);
+void sendToRole(uint8_t role, const uint8_t color[3]);
 void updateEyeAnimation();
 void swatchPreview();
 void animationPreview();

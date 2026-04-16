@@ -12,7 +12,7 @@ uint8_t debounceStart = 0;
 
 // Animation mode (0 = glitchLoop, 1 = eye animation, expand as needed)
 uint8_t animationMode = 0;
-const uint8_t numAnimationModes = 2;
+const uint8_t numAnimationModes = 3;
 
 // Swatch preview animation flag
 bool swatchPreviewActive = false;
@@ -248,4 +248,16 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     checkButtons();
     // Slow down to prevent excessive CPU usage
     delay(slowDown);
+}
+
+// MARK: Role-based output ------------------------------
+// Convenience wrapper: calls sendToRGB for every segment whose role matches.
+// For correct SR/GPIO ordering the caller should invoke ROLE_EYE first (SR buffer),
+// then ROLE_CORE (triggers the PWM frame that flushes the SR buffer).
+void sendToRole(uint8_t role, const uint8_t color[3]) {
+    for (uint8_t seg = 0; seg < numLEDs; seg++) {
+        if (led[seg].role == role) {
+            sendToRGB(seg, color);
+        }
+    }
 }

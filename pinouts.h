@@ -38,24 +38,24 @@ struct PinConfig {
 //   QG=unused  QH=unused
 const PinConfig NANOFRAME_PINOUT = {
     .leds = {
-        {PC1, PC2, PC3, false, 0}, // Seg 0: Core LED (direct GPIO)
-        {0,   0,   0,   true,  0}, // Seg 1: SR ch0 — eye top-left
-        {0,   0,   0,   true,  1}, // Seg 2: SR ch1 — eye bottom-left
-        {0,   0,   0,   true,  2}, // Seg 3: SR ch2 — eye top-right
-        {0,   0,   0,   true,  3}, // Seg 4: SR ch3 — eye bottom-right
+        {PC1, PC2, PC3, false, 0, ROLE_CORE}, // Seg 0: Core LED (direct GPIO)
+        {0,   0,   0,   true,  0, ROLE_EYE},  // Seg 1: SR ch0 — eye top-left
+        {0,   0,   0,   true,  1, ROLE_EYE},  // Seg 2: SR ch1 — eye bottom-left
+        {0,   0,   0,   true,  2, ROLE_EYE},  // Seg 3: SR ch2 — eye top-right
+        {0,   0,   0,   true,  3, ROLE_EYE},  // Seg 4: SR ch3 — eye bottom-right
     },
     .numLEDs = 5,
     .shiftReg    = {PD4, PD3, PD2}, // SER, RCLK, SRCLK
     .shiftRegChannels = 4,
-    .colorButton = PC1,
+    .colorButton = PC4,
     .animButton = PC5
 };
 
 // Configuration for Aurora Glasya
 const PinConfig AURORA_GLASYA_PINOUT = {
     .leds = {
-        {PC4, PC5, PC6, false, 0}, // Seg 0: Upper LEDs
-        {PD4, PD5, PD3, false, 0}, // Seg 1: Lower LEDs
+        {PC4, PC5, PC6, false, 0, ROLE_CORE}, // Seg 0: Upper LEDs
+        {PD4, PD5, PD3, false, 0, ROLE_CORE}, // Seg 1: Lower LEDs
     },
     .numLEDs = 2,
     .shiftReg    = {0, 0, 0},
@@ -67,8 +67,8 @@ const PinConfig AURORA_GLASYA_PINOUT = {
 // Configuration for Blinder Mini
 const PinConfig BLINDER_MINI_PINOUT = {
     .leds = {
-        {PC4, PC5, PC6, false, 0}, // Seg 0: Upper LEDs
-        {PD4, PD5, PD3, false, 0}, // Seg 1: Lower LEDs
+        {PC4, PC5, PC6, false, 0, ROLE_CORE}, // Seg 0: Upper LEDs
+        {PD4, PD5, PD3, false, 0, ROLE_CORE}, // Seg 1: Lower LEDs
     },
     .numLEDs = 2,
     .shiftReg    = {0, 0, 0},
@@ -80,8 +80,8 @@ const PinConfig BLINDER_MINI_PINOUT = {
 // Configuration for AG Echo Frame
 const PinConfig AG_ECHO_FRAME_PINOUT = {
     .leds = {
-        {PD7, PD6, PD5, false, 0}, // Seg 0: Eyepiece
-        {PD2, PD3, PD4, false, 0}, // Seg 1: Main body
+        {PD7, PD6, PD5, false, 0, ROLE_CORE}, // Seg 0: Eyepiece
+        {PD2, PD3, PD4, false, 0, ROLE_CORE}, // Seg 1: Main body
     },
     .numLEDs = 2,
     .shiftReg    = {0, 0, 0},

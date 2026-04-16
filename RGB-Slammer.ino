@@ -113,7 +113,7 @@ void setup() {
     // Try to load saved settings from flash
     if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 22;
+        swNum = 0;
         currentBrightness = 0.4; // Default brightness
         animationMode = 0; // Default to glitchLoop
     }
@@ -145,11 +145,20 @@ void loop() {
             case 0:
             default:
                 glitchLoop(70, 20, 1000);
+                updateEyeAnimation();
+                sendToRGB(0, swatch[swNum].background);
                 break;
             case 1:
                 // Eye animation: SR pods run their pulse cycle while the core LED holds swatch background.
                 // updateEyeAnimation() writes directly to shiftRegColors[]; the sendToRGB(0,...) call
                 // flushes those values to the shift registers via the GPIO PWM frame.
+                updateEyeAnimation();
+                sendToRGB(0, swatch[swNum].background);
+                break;
+            case 2:
+                // Mirror eye animation: left/right eye pods pulse in-phase or anti-phase
+                // while the core LED holds swatch background.
+                // updateEyeAnimation() handles both modes via the global animationMode.
                 updateEyeAnimation();
                 sendToRGB(0, swatch[swNum].background);
                 break;
@@ -191,8 +200,13 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
         }
 
         if (effectTrigger) {
-            // Apply a special effect
-            uint8_t flickerSegment = random(0, numLEDs);
+            // Apply a special effect — restricted to ROLE_CORE segments only
+            uint8_t flickerSegment = 0;
+            for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_CORE) { flickerSegment = s; break; } }
+            // Sample the current eye animation frame into the SR buffer before the effect runs.
+            // Effects that explicitly call showColor/fadeToColor with an eye color will overwrite this;
+            // effects that don't (e.g. glitch4) will display the sampled frame, frozen, for their duration.
+            updateEyeAnimation();
             // Pick a random glitch effect
             switch (random(0, 6)) {
                 case 0:
@@ -216,9 +230,14 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t effectChance, const i
             }
             currentTime = millis();
         } else {
-            // Normal flicker — drive all direct segments
+            // Normal flicker — core LED flickers; eye pods animate continuously.
+            // updateEyeAnimation() samples the pulse state into shiftRegColors[], then
+            // flicker() calls sendToRGB(core) which flushes the buffer to the SR.
             for (uint8_t seg = 0; seg < numLEDs; seg++) {
-                flicker(seg, flickerChance, seg == 0 ? 200 : 0, seg == 0 ? 255 : 200);
+                if (led[seg].role == ROLE_CORE) {
+                    updateEyeAnimation();
+                    flicker(seg, flickerChance, 200, 255);
+                }
             }
             currentTime = millis();
         }
@@ -247,17 +266,18 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 
         float fadeRatio = (float)(millis() - startTime) / fadeTime;
         for (int pin = 0; pin < 3; pin++) {
-            // Segment 0 fades toward color1; all others fade toward color2
-            output[0][pin] = startColor[0][pin] + (color1[pin] - startColor[0][pin]) * fadeRatio;
-            for (uint8_t seg = 1; seg < numLEDs; seg++) {
-                output[seg][pin] = startColor[seg][pin] + (color2[pin] - startColor[seg][pin]) * fadeRatio;
+            for (uint8_t seg = 0; seg < numLEDs; seg++) {
+                const uint8_t* target = (led[seg].role == ROLE_CORE) ? color1 : color2;
+                output[seg][pin] = startColor[seg][pin] + (target[pin] - startColor[seg][pin]) * fadeRatio;
             }
         }
-        // Update SR segment buffers first, then trigger GPIO PWM + SR clock-out
-        for (uint8_t seg = 1; seg < numLEDs; seg++) {
-            sendToRGB(seg, output[seg]);
+        // Send eye (SR) segments first so they're buffered before the GPIO flush
+        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            if (led[seg].role == ROLE_EYE) sendToRGB(seg, output[seg]);
         }
-        sendToRGB(0, output[0]);
+        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            if (led[seg].role == ROLE_CORE) sendToRGB(seg, output[seg]);
+        }
     }
 }
 
@@ -270,11 +290,13 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
         if (swatchPreviewActive) {
             return; // Immediately exit to allow swatch preview to play
         }
-        // Update SR segment buffers first, then trigger GPIO PWM + SR clock-out
-        for (uint8_t seg = 1; seg < numLEDs; seg++) {
-            sendToRGB(seg, color2);
+        // Send eye (SR) segments first so they're buffered before the GPIO flush
+        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            if (led[seg].role == ROLE_EYE) sendToRGB(seg, color2);
         }
-        sendToRGB(0, color1);
+        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            if (led[seg].role == ROLE_CORE) sendToRGB(seg, color1);
+        }
     }
 }
 
@@ -299,12 +321,13 @@ void glitch1(const uint8_t segment, int duration){
             return; // Immediately exit to allow swatch preview to play
         }
 
-        if (segment == 0) {
-            showColor(swatch[swNum].contrast, swatch[swNum].accent,50);
-            showColor(swatch[swNum].contrast, swatch[swNum].background,50);
+        // Animate the active segment; the opposite role always holds contrast
+        if (led[segment].role == ROLE_CORE) {
+            showColor(swatch[swNum].accent,      swatch[swNum].contrast, 50);
+            showColor(swatch[swNum].background,  swatch[swNum].contrast, 50);
         } else {
-            showColor(swatch[swNum].accent, swatch[swNum].contrast,50);
-            showColor(swatch[swNum].background, swatch[swNum].contrast,50);
+            showColor(swatch[swNum].contrast, swatch[swNum].accent,      50);
+            showColor(swatch[swNum].contrast, swatch[swNum].background,  50);
         }
     }
 }
@@ -322,22 +345,26 @@ void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
         rapidPulse(color1, color2, 50);
     }
 
-    // Part 2: Rapidly fade through all swatch colors from background to primary
-    uint8_t fadeTime = 50; // Quick fade time between colors
-    // Fade through the colors in sequence: background → contrast → midtone → accent → primary
-    fadeToColor(swatch[swNum].background,   swatch[swNum].background,   fadeTime);
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast,     fadeTime);
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].midtone,      fadeTime);
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].accent,       fadeTime);
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].primary,      fadeTime);
+    // Part 2: Rapidly fade core through all swatch colors; eyes hold contrast throughout
+    uint8_t fadeTime = 50;
+    fadeToColor(swatch[swNum].background,   swatch[swNum].contrast, fadeTime);
+    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast, fadeTime);
+    fadeToColor(swatch[swNum].midtone,      swatch[swNum].contrast, fadeTime);
+    fadeToColor(swatch[swNum].accent,       swatch[swNum].contrast, fadeTime);
+    fadeToColor(swatch[swNum].primary,      swatch[swNum].contrast, fadeTime);
 }
 
 // -------------------------------------------------------------------------------------
 // MARK: glitch3
 void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     uint8_t startColor[3] = {handoverColor[segment][0], handoverColor[segment][1], handoverColor[segment][2]};
+    // Find a representative segment of the opposite role for handover reference
     uint8_t otherSegment = 0;
-    if (segment == 0) {otherSegment = 1;}
+    if (led[segment].role == ROLE_CORE) {
+        for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_EYE)  { otherSegment = s; break; } }
+    } else {
+        for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_CORE) { otherSegment = s; break; } }
+    }
     // Hold otherSegment at its handoverColor, and flash segment between startColor and color2 twice
     for (int reps = 0; reps < 3; reps++) {
         // Check if swatch preview should interrupt this animation
@@ -345,12 +372,12 @@ void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
             return; // Immediately exit to allow swatch preview to play
         }
 
-        if (segment == 0) {
-            showColor(startColor, handoverColor[1], duration);
-            showColor(color2, handoverColor[1], duration);
+        if (led[segment].role == ROLE_CORE) {
+            showColor(startColor, handoverColor[otherSegment], duration);
+            showColor(color2, handoverColor[otherSegment], duration);
         } else {
-            showColor(handoverColor[0], startColor, duration);
-            showColor(handoverColor[0], color2, duration);
+            showColor(handoverColor[otherSegment], startColor, duration);
+            showColor(handoverColor[otherSegment], color2, duration);
         }
     }
 }
@@ -367,6 +394,7 @@ void glitch4(uint8_t reps, int duration) {
         }
 
         for (uint8_t segment = 0; segment < numLEDs; segment++) {
+            if (led[segment].role == ROLE_EYE) continue; // eyes hold contrast via glitchLoop pre-seed
             gradientPosition(random(1, 255), color);
             for (uint8_t i = 0; i < reps; i++) {
                 sendToRGB(segment, color);
@@ -393,13 +421,13 @@ void glitch5(){
         // Get color at this position in the gradient
         gradientPosition(waveform[waveformIndex].waveform[i], outputColor);
 
-        // Show this color on both LEDs briefly
-        showColor(outputColor, outputColor, 50);
+        // Show this color on the core LED; eyes hold contrast
+        showColor(outputColor, swatch[swNum].contrast, 50);
 
-        // Brief black flash every few steps for a glitchy effect
+        // Brief black flash on core every few steps for a glitchy effect
         if (i % 4 == 0) {
             uint8_t blackColor[3] = {0, 0, 0};
-            showColor(blackColor, blackColor, 10);
+            showColor(blackColor, swatch[swNum].contrast, 10);
         }
     }
 
@@ -412,22 +440,22 @@ void glitch5(){
 
         uint8_t randomPos = random(0, 32);
         gradientPosition(waveform[waveformIndex].waveform[randomPos], outputColor);
-        showColor(outputColor, outputColor, 30);
+        showColor(outputColor, swatch[swNum].contrast, 30);
 
         // Brief flashes to black between jumps
         uint8_t blackColor[3] = {0, 0, 0};
-        showColor(blackColor, blackColor, 15);
+        showColor(blackColor, swatch[swNum].contrast, 15);
     }
 
-    // End with a final dramatic fade to black
-    fadeToColor(swatch[swNum].contrast, swatch[swNum].background, 300);
+    // End with a final dramatic fade to black on core; eyes hold contrast
+    fadeToColor(swatch[swNum].background, swatch[swNum].contrast, 300);
 }
 
 // -------------------------------------------------------------------------------------
 // MARK: rapidPulse
 void rapidPulse(uint8_t color1[3], uint8_t color2[3], int speed){
-    showColor(color1, color1, speed);
-    showColor(color2, color2, speed);
+    showColor(color1, color2, speed); // core = color1, eye = color2
+    showColor(color2, color2, speed); // core = color2, eye = color2
 }
 
 // -------------------------------------------------------------------------------------
@@ -447,15 +475,13 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
         }
 
         int selection = random(0, 3);
-        // Set LED colors based on selection
+        // Core flickers between gradient positions; eyes hold contrast throughout
         if (selection == 0) {
-            showColor(output1, output2, interval);
+            showColor(output1, swatch[swNum].contrast, interval);
         } else if (selection == 1) {
-            // Second segment gets color2, first gets color1
-            showColor(output2, output1, interval);
+            showColor(output2, swatch[swNum].contrast, interval);
         } else {
-            // Neither selected, both get color1
-            showColor(output1, output1, interval);
+            showColor(output1, swatch[swNum].contrast, interval);
         }
     }
 }
@@ -536,144 +562,85 @@ void animationPreview() {
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: updateEyeAnimation
-// Non-blocking, millis()-based animation for the 4 SR eye channels.
-// Writes directly to shiftRegColors[]; call this then sendToRGB(0, ...) to flush
-// the updated values to the shift registers via the GPIO PWM frame.
-//
-// Used by animation mode 1 in loop(). For unified animations that drive all
-// segments equally, use the standard animation functions instead (glitchLoop, etc.).
-//
-// Physical layout on the glasses:
-//   Ch0 (shiftRegColors[0])  Ch2 (shiftRegColors[2])  <- top    (Pair A — primary)
-//   Ch1 (shiftRegColors[1])  Ch3 (shiftRegColors[3])  <- bottom (Pair B — accent)
-//
-// Normal cycle: alternating double-pulse per pair with contrast shimmer on idle channels.
-// Random glitch: every 10–20 s, a 2-second blink event fires on a random channel.
-void updateEyeAnimation() {
+// MARK: calcPulseLevel
+// Shared double-pulse brightness envelope used by updateEyeAnimation (both modes).
+// pt = milliseconds into the 570 ms pulse window. Returns 0–255.
+// Pulse shape: P1 rise 50 ms, P1 fall 70 ms, P2 rise 50 ms, P2 slow fall 400 ms.
+static uint8_t calcPulseLevel(unsigned long pt) {
+    if (pt < 50UL)  return (uint8_t)((pt * 255UL) / 50UL);           // P1 rise
+    pt -= 50UL;
+    if (pt < 70UL)  return (uint8_t)(((70UL - pt) * 255UL) / 70UL);  // P1 fall
+    pt -= 70UL;
+    if (pt < 50UL)  return (uint8_t)((pt * 255UL) / 50UL);           // P2 rise
+    pt -= 50UL;
+    if (pt < 400UL) return (uint8_t)(((400UL - pt) * 255UL) / 400UL); // P2 fall
+    return 0;
+}
 
-    // --- Periodic random eye glitch ---
-    // Every 10–20 s, one channel blinks rapidly for 2 s while others shimmer at contrast.
-    static unsigned long nextGlitchTime  = 0;   // 0 = not yet scheduled
-    static unsigned long glitchStartTime = 0;
-    static uint8_t       glitchChannel   = 255; // 255 = no active glitch
+// -------------------------------------------------------------------------------------
+// MARK: updateEyeAnimation
+// Non-blocking, millis()-based pulse animation for the 4 SR eye channels.
+// Reads animationMode to select sub-mode:
+//   mode 1 — Pair:   ch0/ch2 (SR1/SR3) fire first, then ch1/ch3 (SR2/SR4).
+//   mode 2 — Mirror: left eye (ch0/ch1) vs right eye (ch2/ch3), cycling between
+//             in-phase and anti-phase every 3 s.
+// Writes directly to shiftRegColors[]; call this then sendToRGB(0, ...) to flush.
+void updateEyeAnimation() {
+    const bool mirrorMode = (animationMode == 2);
+
+    static uint8_t       baseFlicker       = 0;
+    static unsigned long lastFlickerSample = 0;
+    // Mirror sub-mode state (unused in mode 1)
+    static bool          mirrorInPhase     = true;
+    static unsigned long modeStartTime     = 0;
 
     unsigned long now = millis();
 
-    // Schedule first / next glitch when idle
-    if (glitchChannel == 255 && nextGlitchTime == 0) {
-        nextGlitchTime = now + 10000UL + (unsigned long)random(0, 10001);
-    }
+    // Mirror sub-mode toggle every 3 s
+    if (modeStartTime == 0) modeStartTime = now;
+    if (now - modeStartTime >= 3000UL) { mirrorInPhase = !mirrorInPhase; modeStartTime = now; }
 
-    // Fire when the timer expires
-    if (glitchChannel == 255 && now >= nextGlitchTime) {
-        glitchChannel   = (uint8_t)random(0, 4);
-        glitchStartTime = now;
-        nextGlitchTime  = 0; // Reschedule after glitch ends
-    }
+    // Shimmer floor — updated at most once per 50 ms so it's visible rather than per-frame noise
+    if (now - lastFlickerSample >= 50UL) { baseFlicker = (uint8_t)random(0, 22); lastFlickerSample = now; }
 
-    // Render the 2 s glitch event.
-    // The selected channel blinks: 10 ms on (primary) / 40 ms off (contrast) per 50 ms cycle.
-    // A new random channel is chosen on each rising edge.
-    // All other channels shimmer at contrast throughout.
-    if (glitchChannel != 255) {
-        if (now - glitchStartTime < 2000UL) {
-            // Throttled shimmer noise — update at most once per 50 ms
-            static uint8_t       glitchNoise     = 0;
-            static unsigned long lastGlitchNoise = 0;
-            if (now - lastGlitchNoise >= 20UL) {
-                glitchNoise     = (uint8_t)random(0, 22);
-                lastGlitchNoise = now;
-            }
+    const uint8_t* base = swatch[swNum].contrast;
 
-            // 10 ms flash in every 50 ms cycle; pick a new random channel on each rising edge
-            bool flashOn = ((now - glitchStartTime) % 20UL) < 10UL;
-            static bool prevFlashOn = false;
-            if (flashOn && !prevFlashOn) {
-                glitchChannel = (uint8_t)random(0, 4);
-            }
-            prevFlashOn = flashOn;
-
-            for (uint8_t ch = 0; ch < 4; ch++) {
-                const uint8_t* base = swatch[swNum].contrast;
-                if (ch == glitchChannel) {
-                    for (uint8_t c = 0; c < 3; c++)
-                        shiftRegColors[ch][c] = flashOn ? swatch[swNum].primary[c] : base[c];
-                } else {
-                    const uint8_t* color = (ch == 0 || ch == 2) ? swatch[swNum].primary
-                                                                : swatch[swNum].accent;
-                    for (uint8_t c = 0; c < 3; c++)
-                        shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * glitchNoise) / 255);
-                }
-            }
-            return; // Skip normal animation during glitch
+    if (mirrorMode) {
+        // Mode 2: left eye (ch0/ch1) vs right eye (ch2/ch3) — in-phase or anti-phase
+        const unsigned long CYCLE_MS = 790UL; // 570 ms pulse + 220 ms gap
+        unsigned long t      = now % CYCLE_MS;
+        unsigned long tRight = mirrorInPhase ? t : (t + CYCLE_MS / 2) % CYCLE_MS;
+        uint8_t lvlLeft  = calcPulseLevel(t);
+        uint8_t lvlRight = calcPulseLevel(tRight);
+        for (uint8_t ch = 0; ch < 4; ch++) {
+            bool isLeft = (ch < 2);
+            const uint8_t* color = isLeft ? swatch[swNum].primary : swatch[swNum].accent;
+            uint8_t lvl = isLeft ? lvlLeft : lvlRight;
+            if (lvl == 0) lvl = baseFlicker;
+            for (uint8_t c = 0; c < 3; c++)
+                shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * lvl) / 255);
         }
-        glitchChannel = 255; // Glitch complete — reschedule on next call
-    }
-
-    // --- Normal double-pulse cycle ---
-    // Timing constants (milliseconds)
-    const unsigned long P1_UP   =  50UL; // pulse 1 rise  (2× speed)
-    const unsigned long P1_DOWN =  50UL; // pulse 1 fall  (2× speed)
-    const unsigned long IGAP    =  40UL; // rest between pulses (2× speed)
-    const unsigned long P2_UP   =  50UL; // pulse 2 rise
-    const unsigned long P2_DOWN = 450UL; // pulse 2 slow fade out
-    const unsigned long PGAP    = 220UL; // gap between pairs (both at contrast)
-
-    const unsigned long PAIR_MS  = P1_UP + P1_DOWN + IGAP + P2_UP + P2_DOWN;
-    const unsigned long CYCLE_MS = (PAIR_MS + PGAP) * 2;
-
-    unsigned long t = now % CYCLE_MS;
-
-    uint8_t brightness = 0;
-    int8_t  activePair = -1; // -1 = both at contrast, 0 = top row, 1 = bottom row
-
-    // Returns brightness (0-255) for a position within a pair's PAIR_MS slot
-    auto pairBrightness = [&](unsigned long pt) -> uint8_t {
-        if (pt < P1_UP)   return (uint8_t)((pt * 255UL) / P1_UP);
-        pt -= P1_UP;
-        if (pt < P1_DOWN) return (uint8_t)(((P1_DOWN - pt) * 255UL) / P1_DOWN);
-        pt -= P1_DOWN;
-        if (pt < IGAP)    return 0;
-        pt -= IGAP;
-        if (pt < P2_UP)   return (uint8_t)((pt * 255UL) / P2_UP);
-        pt -= P2_UP;
-        return (uint8_t)(((P2_DOWN - pt) * 255UL) / P2_DOWN); // slow fade-out
-    };
-
-    if (t < PAIR_MS) {
-        activePair = 0;
-        brightness = pairBrightness(t);
-    } else if (t < PAIR_MS + PGAP) {
-        activePair = -1;
-    } else if (t < PAIR_MS * 2 + PGAP) {
-        activePair = 1;
-        brightness = pairBrightness(t - (PAIR_MS + PGAP));
-    }
-    // else: second pair gap — activePair stays -1
-
-    // Flicker sample for inactive channels — updated at most once per 50 ms
-    // so the shimmer is visible rather than per-frame noise.
-    static uint8_t       baseFlicker       = 0;
-    static unsigned long lastFlickerSample = 0;
-    if (now - lastFlickerSample >= 50UL) {
-        baseFlicker       = (uint8_t)random(0, 22);
-        lastFlickerSample = now;
-    }
-
-    // ch 0,2 = top row (Pair A) — swatch primary
-    // ch 1,3 = bottom row (Pair B) — swatch accent
-    // Active pair pulses smoothly; idle channels shimmer at contrast floor.
-    for (uint8_t ch = 0; ch < 4; ch++) {
-        bool isPairA         = (ch == 0 || ch == 2);
-        int8_t pairIndex     = isPairA ? 0 : 1;
-        const uint8_t* color = isPairA ? swatch[swNum].primary : swatch[swNum].accent;
-        const uint8_t* base  = swatch[swNum].contrast;
-
-        uint8_t lvl = (activePair == pairIndex) ? brightness : baseFlicker;
-
-        for (uint8_t c = 0; c < 3; c++) {
-            shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * lvl) / 255);
+    } else {
+        // Mode 1: SR1/SR3 (ch0/ch2) fire first, then SR2/SR4 (ch1/ch3)
+        const unsigned long PAIR_MS  = 570UL;
+        const unsigned long CYCLE_MS = (PAIR_MS + 220UL) * 2; // 1580 ms
+        unsigned long t = now % CYCLE_MS;
+        uint8_t brightness = 0;
+        int8_t  activePair = -1;
+        if (t < PAIR_MS) {
+            activePair = 0; brightness = calcPulseLevel(t);
+        } else if (t < PAIR_MS + 220UL) {
+            activePair = -1;
+        } else if (t < PAIR_MS * 2 + 220UL) {
+            activePair = 1; brightness = calcPulseLevel(t - (PAIR_MS + 220UL));
+        }
+        for (uint8_t ch = 0; ch < 4; ch++) {
+            bool isPairA     = (ch == 0 || ch == 2); // ch0=SR1, ch2=SR3
+            int8_t pairIndex = isPairA ? 0 : 1;
+            const uint8_t* color = isPairA ? swatch[swNum].primary : swatch[swNum].accent;
+            uint8_t lvl = (activePair == pairIndex) ? brightness : baseFlicker;
+            for (uint8_t c = 0; c < 3; c++)
+                shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * lvl) / 255);
         }
     }
 }
