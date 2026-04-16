@@ -149,19 +149,19 @@ void loop() {
         switch (animationMode) {
             case 0:
             default:
-                glitchLoop(70, 100, 15, 1000);
+                glitchLoop(20, 0);
                 break;
             case 1:
-                glitchLoop(70, 100, 15, 1000);
+                glitchLoop(20, 0);
                 break;
             case 2:
-                glitchLoop(70, 100, 15, 1000);
+                glitchLoop(20, 0);
                 break;
             case 3:
-                glitchLoop(70, 100, 15, 1000);
+                glitchLoop(20, 0);
                 break;
             case 4:
-                glitchLoop(70, 100, 15, 1000);
+                glitchLoop(20, 0);
                 break;
         }
     }
@@ -188,17 +188,15 @@ void bounceBoot(int speed){
 
 // -------------------------------------------------------------------------------------
 // MARK: glitchLoop
-// Per-frame dual-channel loop: SR and Core values are calculated each iteration then
-// flushed atomically via the SR-first pattern (SR written before sendToRGB flushes both).
+// Per-frame dual-channel loop: runs until interrupted by a swatch or animation preview.
 // SR channel:   probability roll → eyeScatter or eyeDoublePulse, writes shiftRegColors[].
 // Core channel: probability roll → blocking glitch effect or default flicker (flush point).
-void glitchLoop(const uint8_t flickerChance, const uint8_t coreEffectChance, const uint8_t srEffectChance, const int duration) {
-    unsigned long startTime = millis();
-    unsigned long currentTime = millis();
-    while (currentTime - startTime < duration) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
+    const uint8_t flickerChance = 70;     // Chance (0-100) that a given frame will have a Core glitch effect instead of default flicker
+    while (true) {
+        // Exit immediately on any preview interrupt
+        if (swatchPreviewActive || animationPreviewActive) {
+            return;
         }
 
         // SR channel: register the SR function for this iteration.
@@ -229,7 +227,6 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t coreEffectChance, con
                     fakeMorse(65, 210, 400);
                     break;
             }
-            currentTime = millis();
         } else {
             // Default: flicker()'s sendToRGB flushes shiftRegColors[] and Core simultaneously.
             for (uint8_t seg = 0; seg < numLEDs; seg++) {
@@ -237,7 +234,6 @@ void glitchLoop(const uint8_t flickerChance, const uint8_t coreEffectChance, con
                     flicker(seg, flickerChance, 200, 255);
                 }
             }
-            currentTime = millis();
         }
     }
 }
