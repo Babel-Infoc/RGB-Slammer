@@ -118,10 +118,10 @@ swatchArray swatch[] = {
     },{
         // 14 Heat treated
         rgba(255,   220,    106,    1),
-        rgba(210,   0,      60,     1),
-        rgba(75,    0,      130,    1),
-        rgba(20,    0,      100,    1),
-        rgba(0,     0,      50,     1)
+        rgba(220,   0,      60,     1),
+        rgba(120,   0,      60,     1),
+        rgba(50,    0,      80,     1),
+        rgba(0,     0,      100,    1)
     },{
         // 15 Neon overdrive
         rgba(255,   0,      150,    1),
@@ -132,10 +132,10 @@ swatchArray swatch[] = {
     },{
         // 16 Neurotoxin
         rgba(200,   255,    0,      1),
-        rgba(255,   0,      200,    1),
-        rgba(0,     255,    150,    1),
-        rgba(100,   0,      150,    1),
-        rgba(0,     50,     50,     1),
+        rgba(100,   150,    0,      1),
+        rgba(0,     100,    100,    1),
+        rgba(150,   0,      200,    1),
+        rgba(50,    0,      100,    1),
     },{
         // 17 Outlier
         rgba(255,   50,     0,      1),

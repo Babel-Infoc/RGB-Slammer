@@ -32,9 +32,9 @@ uint8_t extLEDs = 0;
 
 // Brightness stored as 8-bit fixed-point: 0-255 = 0.0-1.0.
 // Default 0.40 → 102; pulse preview 0.65 → 166.
-uint8_t currentBrightness = 100;
+uint8_t currentBrightness = 120;
 // Temporary brightness value used when previewing a new swatch
-uint8_t pulseBrightness = 200;
+uint8_t pulseBrightness = 150;
 
 // Individual section brightness adjustment
 uint8_t coreOutputScale = 100;
@@ -139,10 +139,11 @@ void loop() {
         switch (animationMode) {
             case 0:
             default:
-                glitchLoop(20, 10);
+                //glitchLoop(20, 10);
+                cautionCitizen();
                 break;
             case 1:
-                glitchLoop(20, 10);
+                cautionCitizen();
                 break;
             case 2:
                 glitchLoop(20, 10);
@@ -224,6 +225,48 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
                     flicker(seg, flickerChance, 200, 255);
                 }
             }
+        }
+    }
+}
+
+// No-arg wrapper: ripple between contrast and background — used as srUpdateCallback idle in cautionCitizen.
+static void cautionRipple() { eyeRipple(192, 255); }
+
+// -------------------------------------------------------------------------------------
+// MARK: cautionCitizen
+// Idle: eyeRipple on SR eye pods (via callback), flicker on core LED.
+// Every 1.5 s: burst of 3 rapid strobe flashes — SR flashes primary/contrast,
+// core flashes accent/contrast — then returns to idle.
+void cautionCitizen() {
+    const unsigned long STROBE_INTERVAL_MS = 1500UL;
+    const uint8_t       STROBE_REPS        = 3;
+    const uint8_t       FLASH_ON_MS        = 20;
+    const uint8_t       FLASH_OFF_MS       = 20;
+
+    static unsigned long lastStrobeTime = 0;
+    if (lastStrobeTime == 0) lastStrobeTime = millis();
+
+    uint8_t coreSeg = 0;
+    for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_CORE) { coreSeg = s; break; } }
+
+    srUpdateCallback = cautionRipple;
+
+    while (true) {
+        if (swatchPreviewActive || animationPreviewActive) return;
+
+        if (millis() - lastStrobeTime >= STROBE_INTERVAL_MS) {
+            // Strobe burst: null callback so showColor drives SR directly
+            srUpdateCallback = nullptr;
+            for (uint8_t i = 0; i < STROBE_REPS; i++) {
+                if (swatchPreviewActive || animationPreviewActive) break;
+                showColor(swatch[swNum].accent,   swatch[swNum].primary,   FLASH_ON_MS);
+                showColor(swatch[swNum].contrast, swatch[swNum].contrast,  FLASH_OFF_MS);
+            }
+            lastStrobeTime = millis();
+            srUpdateCallback = cautionRipple;
+        } else {
+            // Idle: flicker drives the core flush; cautionRipple callback animates SR
+            flicker(coreSeg, 70, 200, 255);
         }
     }
 }
@@ -724,9 +767,7 @@ void eyeScatter() {
             case 3:  color = swatch[swNum].contrast;   break;
             default: color = swatch[swNum].background; break;
         }
-        for (uint8_t c = 0; c < 3; c++) {
-            shiftRegColors[ch][c] = (uint8_t)(((uint16_t)color[c] * level[ch]) >> 8);
-        }
+        setSRChannel(ch, color, swatch[swNum].background, level[ch]);
     }
 }
 
