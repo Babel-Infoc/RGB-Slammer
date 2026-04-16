@@ -130,7 +130,7 @@ void checkButtons() {
 // MARK: Shift Register Output ------------------------------
 // Reference to shift register globals defined in the main sketch
 extern shiftRegPins shiftReg;
-extern uint8_t numShiftRegChannels;
+extern uint8_t extLEDs;
 
 // Current colors for each shift register channel (up to 4)
 uint8_t shiftRegColors[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
@@ -148,11 +148,11 @@ void (*srUpdateCallback)() = nullptr;
 //   SR segment    — buffers the colour into shiftRegColors[]; the buffer is output on the
 //                    next GPIO segment’s PWM frame, keeping all outputs in temporal sync.
 // Call SR segments before the GPIO segment within one animation step for zero lag.
-extern uint8_t numLEDs;
+extern uint8_t coreLEDs;
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // Always record this colour as the handover value for transition animations
-    if (segment < numLEDs) {
+    if (segment < coreLEDs) {
         for (uint8_t i = 0; i < 3; i++) {
             handoverColor[segment][i] = rgbValue[i];
         }
@@ -160,7 +160,7 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // SR segment: buffer the colour and return early.
     // It will be clocked out during the next GPIO segment’s PWM frame.
-    if (segment < numLEDs && led[segment].isSR) {
+    if (segment < coreLEDs && led[segment].isSR) {
         uint8_t ch = led[segment].srChannel;
         for (uint8_t i = 0; i < 3; i++) {
             shiftRegColors[ch][i] = rgbValue[i];
@@ -174,7 +174,7 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     if (srUpdateCallback) srUpdateCallback();
 
     // Brightness adjustment mode: suppress SR output — pods show black
-    if (brightnessAdjustMode && numShiftRegChannels > 0) {
+    if (brightnessAdjustMode && extLEDs > 0) {
         memset(shiftRegColors, 0, sizeof(shiftRegColors));
     }
 
@@ -189,7 +189,7 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // Gamma-correct all SR channel colours, then apply per-type output scale.
     uint8_t tunedSR[4][3];
-    if (numShiftRegChannels > 0) {
+    if (extLEDs > 0) {
         for (uint8_t ch = 0; ch < 4; ch++) {
             for (uint8_t pin = 0; pin < 3; pin++) {
                 uint8_t adj      = (uint8_t)(((uint16_t)shiftRegColors[ch][pin] * tuneRatio[pin])    >> 8);
@@ -206,13 +206,13 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     for (int brightness = 0; brightness < 100; brightness++) {
 
         // Drive direct LED only for valid segments
-        if (segment < numLEDs) {
+        if (segment < coreLEDs) {
             digitalWrite(led[segment].red,   brightness < tunedRGB[0] ? LOW : HIGH);
             digitalWrite(led[segment].green, brightness < tunedRGB[1] ? LOW : HIGH);
             digitalWrite(led[segment].blue,  brightness < tunedRGB[2] ? LOW : HIGH);
         }
 
-        if (numShiftRegChannels > 0) {
+        if (extLEDs > 0) {
             uint8_t sr1Byte = 0xFF; // U19: bits 0-5 = LEDs, bits 6-7 = BTN1/BTN2 (stay HIGH)
             uint8_t sr2Byte = 0xFF; // U20: bits 0-5 = LEDs, bits 6-7 unused (stay HIGH)
 
@@ -240,12 +240,12 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     }
 
     // Return all outputs to idle-off after the PWM frame
-    if (segment < numLEDs) {
+    if (segment < coreLEDs) {
         digitalWrite(led[segment].red,   HIGH);
         digitalWrite(led[segment].green, HIGH);
         digitalWrite(led[segment].blue,  HIGH);
     }
-    if (numShiftRegChannels > 0) {
+    if (extLEDs > 0) {
         digitalWrite(shiftReg.rclk, LOW);
         shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
         shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
@@ -263,7 +263,7 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 // For correct SR/GPIO ordering the caller should invoke ROLE_EXT first (SR buffer),
 // then ROLE_CORE (triggers the PWM frame that flushes the SR buffer).
 void sendToRole(uint8_t role, const uint8_t color[3]) {
-    for (uint8_t seg = 0; seg < numLEDs; seg++) {
+    for (uint8_t seg = 0; seg < coreLEDs; seg++) {
         if (led[seg].role == role) {
             sendToRGB(seg, color);
         }

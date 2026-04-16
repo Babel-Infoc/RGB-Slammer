@@ -16,7 +16,7 @@ enum ConfigType {
 
 struct PinConfig {
     ledSegment leds[MAX_LED_SEGMENTS]; // All segments: GPIO first, then SR
-    uint8_t numLEDs;           // Total segments (GPIO + SR)
+    uint8_t coreLEDs;           // Total segments (GPIO + SR)
     shiftRegPins shiftReg;     // Shift register control pins (SER, RCLK, SRCLK)
     uint8_t shiftRegChannels;  // Number of RGB LED channels on the shift register (0 = none)
     uint8_t colorButton;
@@ -44,7 +44,7 @@ const PinConfig NANOFRAME_PINOUT = {
         {0,   0,   0,   true,  2, ROLE_EXT},  // Seg 3: SR ch2 — eye top-right
         {0,   0,   0,   true,  3, ROLE_EXT},  // Seg 4: SR ch3 — eye bottom-right
     },
-    .numLEDs = 5,
+    .coreLEDs = 5,
     .shiftReg    = {PD4, PD3, PD2}, // SER, RCLK, SRCLK
     .shiftRegChannels = 4,
     .colorButton = PC4,
@@ -57,7 +57,7 @@ const PinConfig AURORA_GLASYA_PINOUT = {
         {PC4, PC5, PC6, false, 0, ROLE_CORE}, // Seg 0: Upper LEDs
         {PD4, PD5, PD3, false, 0, ROLE_CORE}, // Seg 1: Lower LEDs
     },
-    .numLEDs = 2,
+    .coreLEDs = 2,
     .shiftReg    = {0, 0, 0},
     .shiftRegChannels = 0,
     .colorButton = PD2,
@@ -70,7 +70,7 @@ const PinConfig BLINDER_MINI_PINOUT = {
         {PC4, PC5, PC6, false, 0, ROLE_CORE}, // Seg 0: Upper LEDs
         {PD4, PD5, PD3, false, 0, ROLE_CORE}, // Seg 1: Lower LEDs
     },
-    .numLEDs = 2,
+    .coreLEDs = 2,
     .shiftReg    = {0, 0, 0},
     .shiftRegChannels = 0,
     .colorButton = PD2,
@@ -83,7 +83,7 @@ const PinConfig AG_ECHO_FRAME_PINOUT = {
         {PD7, PD6, PD5, false, 0, ROLE_CORE}, // Seg 0: Eyepiece
         {PD2, PD3, PD4, false, 0, ROLE_CORE}, // Seg 1: Main body
     },
-    .numLEDs = 2,
+    .coreLEDs = 2,
     .shiftReg    = {0, 0, 0},
     .shiftRegChannels = 0,
     .colorButton = PC3,

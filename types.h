@@ -33,11 +33,11 @@ extern ledSegment led[];
 // Pin definitions
 extern uint8_t colorBtn;
 extern uint8_t animBtn;
-extern uint8_t numLEDs;
+extern uint8_t coreLEDs;
 
 // Shift register configuration
 extern shiftRegPins shiftReg;
-extern uint8_t numShiftRegChannels;
+extern uint8_t extLEDs;
 
 // LED luminance information
 struct luminance {

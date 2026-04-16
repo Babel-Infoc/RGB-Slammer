@@ -23,56 +23,56 @@ swatchArray swatch[] = {
         rgba(255,   150,    0,      1),
         rgba(200,   100,    0,      1),
         rgba(100,   50,     0,      1),
-        rgba(50,    0,      0,      1),
+        rgba(50,    20,     0,      1),
     },{
         // 1 Red mist
         rgba(255,   150,    150,    1),
         rgba(255,   0,      150,    1),
         rgba(200,   0,      100,    1),
         rgba(150,   0,      50,     1),
-        rgba(0,     0,      0,      1),
+        rgba(50,    0,      20,     1),
     },{
         // 2 Arasaka
         rgba(255,   0,      0,      1),
         rgba(200,   0,      0,      1),
         rgba(150,   0,      0,      1),
         rgba(100,   0,      0,      1),
-        rgba(0,     0,      0,      1),
+        rgba(50,    0,      0,      1),
     },{
         // 3 Acid spill
         rgba(0,     255,    200,    1),
         rgba(0,     255,    150,    1),
         rgba(0,     200,    100,    1),
         rgba(0,     100,    50,     1),
-        rgba(0,     0,      0,      1),
+        rgba(0,     50,     20,     1),
     },{
         // 4 Mox
-        rgba(150,   255,    150,    1),
-        rgba(150,   255,    0,      1),
-        rgba(100,   200,    0,      1),
-        rgba(50,    150,    0,      1),
-        rgba(0,     0,      0,      1),
+        rgba(200,   255,    200,    1),
+        rgba(200,   255,    0,      1),
+        rgba(150,   200,    0,      1),
+        rgba(100,   150,    0,      1),
+        rgba(20,    50,     0,      1),
     },{
         // 5 Static romance
-        rgba(200,   0,      255,    1),
+        rgba(200,   100,    255,    1),
         rgba(150,   0,      255,    1),
         rgba(100,   0,      200,    1),
         rgba(50,    0,      100,    1),
-        rgba(0,     0,      0,      1),
+        rgba(20,    0,      50,     1),
     },{
         // 6 Corpo
         rgba(150,   150,    255,    1),
         rgba(0,     150,    255,    1),
         rgba(0,     100,    200,    1),
         rgba(0,     50,     150,    1),
-        rgba(0,     0,      0,      1),
+        rgba(0,     20,     50,     1),
     },{
-        // 7 Radioactive
-        rgba(255,   255,    150,    1),
-        rgba(255,   255,    0,      1),
-        rgba(200,   250,    0,      1),
-        rgba(120,   100,    0,      1),
-        rgba(100,   50,     0,      1),
+        // 7 Stand back, citizen
+        rgba(255,   0,      0,      1),
+        rgba(150,   0,      50,     1),
+        rgba(50,    0,      150,    1),
+        rgba(0,     0,      255,    1),
+        rgba(0,     0,      50,      1),
     },{
         // 8 Brandi
         rgba(255,   0,      255,    1),
@@ -93,98 +93,77 @@ swatchArray swatch[] = {
         rgba(200,   200,    200,    1),
         rgba(150,   150,    150,    1),
         rgba(100,   100,    100,    1),
-        rgba(10,    10,     10,     1),
+        rgba(20,    20,     20,     1),
     },{
-        // Classic synthwave
+        // 11 Classic synthwave
         rgba(255,   0,      200,    1),
         rgba(200,   0,      100,    1),
         rgba(0,     200,    255,    1),
         rgba(50,    0,      200,    1),
         rgba(100,   0,      50,     1),
     },{
-        // Villa Straylight
+        // 12 Villa Straylight
         rgba(50,    200,    255,    1),
         rgba(200,   50,     255,    1),
         rgba(150,   80,     255,    1),
         rgba(100,   40,     255,    1),
         rgba(50,    20,     255,    1),
     },{
-        // Sunset peach
+        // 13 Sunset peach
         rgba(255,   100,    0,      1),
         rgba(200,   50,     0,      1),
         rgba(255,   0,      100,    1),
         rgba(200,   0,      150,    1),
-        rgba(0,     0,      0,      1)
+        rgba(50,    0,      20,     1)
     },{
-        // Heat treated
+        // 14 Heat treated
         rgba(255,   220,    106,    1),
-        rgba(209,   0,      52,     1),
+        rgba(210,   0,      60,     1),
         rgba(75,    0,      130,    1),
-        rgba(0,     0,      97,     1),
-        rgba(0,     0,      0,      1)
+        rgba(20,    0,      100,    1),
+        rgba(0,     0,      50,     1)
     },{
-        // Neon overdrive
+        // 15 Neon overdrive
         rgba(255,   0,      150,    1),
         rgba(0,     255,    200,    1),
         rgba(150,   0,      255,    1),
         rgba(255,   200,    0,      1),
         rgba(0,     0,      50,     1),
     },{
-        // Chemical waste
-        rgba(255,   100,    0,      1),
-        rgba(255,   200,    50,     1),
-        rgba(0,     150,    255,    1),
-        rgba(0,     50,     150,    1),
-        rgba(0,     0,      0,      1),
-    },{
-        // Neurotoxin
+        // 16 Neurotoxin
         rgba(200,   255,    0,      1),
         rgba(255,   0,      200,    1),
         rgba(0,     255,    150,    1),
         rgba(100,   0,      150,    1),
-        rgba(0,     0,      0,      1),
+        rgba(0,     50,     50,     1),
     },{
-        // Outlier
+        // 17 Outlier
         rgba(255,   50,     0,      1),
         rgba(255,   150,    0,      1),
         rgba(100,   0,      255,    1),
         rgba(0,     100,    200,    1),
-        rgba(0,     0,      0,      1),
+        rgba(50,    0,      50,     1),
     },{
-        // Turbo killer
+        // 18 Turbo killer
         rgba(150,   0,      200,    1),
         rgba(255,   0,      100,    1),
         rgba(0,     100,    255,    1),
         rgba(50,    0,      100,    1),
-        rgba(0,     0,      0,      1),
+        rgba(20,    0,      60,     1),
     },{
-        // Neon rain
+        // 19 Neon rain
         rgba(0,     255,    255,    1),
         rgba(255,   100,    200,    1),
         rgba(0,     200,    100,    1),
         rgba(100,   0,      150,    1),
         rgba(0,     0,      50,     1),
     },{
-        // BD Star
-        rgba(255,   0,      255,    1),
-        rgba(0,     200,    255,    1),
-        rgba(255,   150,    0,      1),
-        rgba(150,   0,      200,    1),
-        rgba(0,     0,      0,      1),
-    },{
-        // Wasteland
-        rgba(255,   180,    0,      1),
-        rgba(255,   80,     150,    1),
-        rgba(150,   0,      255,    1),
-        rgba(100,   50,     0,      1),
-        rgba(0,     0,      0,      1),
-    },{
-        // Holo drift
+        // 20 Holo drift
         rgba(0,     255,    150,    1),
         rgba(100,   150,    255,    1),
         rgba(200,   0,      255,    1),
         rgba(0,     100,    150,    1),
-        rgba(0,     0,      50,     1),
+        rgba(0,     50,     50,     1),
     }
 };
 

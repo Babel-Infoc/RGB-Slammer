@@ -6,6 +6,7 @@ MIT License
 This script is best edited in VSCode for color token selection in swatches.cpp
 */
 
+
 #include <Arduino.h>
 #include "types.h"
 #include "swatches.h"
@@ -13,20 +14,7 @@ This script is best edited in VSCode for color token selection in swatches.cpp
 #include "flashStorage.h"
 #include "pinouts.h"
 
-// Forward declarations
-void animationPreview();
-void eyeScatter();
-void eyeDoublePulse();
-void updateGlitchEyes();
-extern void (*srUpdateCallback)(); // defined in rgbProcessor.cpp
-void animation0();
-void animation1();
-void animation2();
-void animation3();
-void animation4();
-
 // Number of directly-driven LED segments (set from active hardware config at boot)
-uint8_t numLEDs = 1;
 
 // Select which hardware configuration to use
 ConfigType activeConfig = NANOFRAME;
@@ -38,8 +26,9 @@ uint8_t animBtn;
 
 // Shift register pin configuration
 shiftRegPins shiftReg;
-// Initialize with 0 channels by default; will be set from active configuration at boot
-uint8_t numShiftRegChannels = 0;
+// Initialise LED channels (will be updated during boot based on active config)
+uint8_t coreLEDs = 0;
+uint8_t extLEDs = 0;
 
 // Brightness stored as 8-bit fixed-point: 0-255 = 0.0-1.0.
 // Default 0.40 → 102; pulse preview 0.65 → 166.
@@ -52,8 +41,8 @@ uint8_t coreOutputScale = 100;
 uint8_t srOutputScale   = 255;
 
 // Brightness adjustment mode limits (0-255 fixed-point: 0.30→77, 0.60→153)
-const uint8_t minBrightness = 77;
-const uint8_t maxBrightness = 153;
+const uint8_t minBrightness = 75;
+const uint8_t maxBrightness = 150;
 const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
 bool brightnessAdjustMode = false;
 
@@ -68,6 +57,9 @@ const luminance red       = {5, 100};
 const luminance green     = {5, 100};
 const luminance blue      = {5, 100};
 
+
+extern void (*srUpdateCallback)(); // defined in rgbProcessor.cpp
+
 // -------------------------------------------------------------------------------------
 // MARK: Setup
 void setup() {
@@ -75,19 +67,19 @@ void setup() {
     const PinConfig& config = getActiveConfig(activeConfig);
 
     // Copy pin configuration from the selected hardware profile
-    for (uint8_t i = 0; i < config.numLEDs && i < MAX_LED_SEGMENTS; i++) {
+    for (uint8_t i = 0; i < config.coreLEDs && i < MAX_LED_SEGMENTS; i++) {
         led[i] = config.leds[i];
     }
-    numLEDs  = config.numLEDs;
+    coreLEDs  = config.coreLEDs;
     colorBtn = config.colorButton;
     animBtn  = config.animButton;
 
     // Copy shift register configuration
     shiftReg            = config.shiftReg;
-    numShiftRegChannels = config.shiftRegChannels;
+    extLEDs = config.shiftRegChannels;
 
     // Set up all LED segments (GPIO only — SR segments have no pins to configure)
-    for (uint8_t segment = 0; segment < numLEDs; segment++) {
+    for (uint8_t segment = 0; segment < coreLEDs; segment++) {
         if (!led[segment].isSR) {
             pinMode(led[segment].red, OUTPUT);
             pinMode(led[segment].green, OUTPUT);
@@ -96,7 +88,7 @@ void setup() {
     }
 
     // Set up shift register pins if configured
-    if (numShiftRegChannels > 0) {
+    if (extLEDs > 0) {
         pinMode(shiftReg.ser,   OUTPUT);
         pinMode(shiftReg.rclk,  OUTPUT);
         pinMode(shiftReg.srclk, OUTPUT);
@@ -116,12 +108,10 @@ void setup() {
     // Try to load saved settings from flash
     if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 5;
+        swNum = 14;
         animationMode = 0;
     }
 
-    // Set default SR animation — runs on every Core sendToRGB flush until overridden.
-    srUpdateCallback = eyeDoublePulse;
 
     // Show the bootup animation
     bounceBoot(40);
@@ -149,19 +139,19 @@ void loop() {
         switch (animationMode) {
             case 0:
             default:
-                glitchLoop(20, 0);
+                glitchLoop(20, 10);
                 break;
             case 1:
-                glitchLoop(20, 0);
+                glitchLoop(20, 10);
                 break;
             case 2:
-                glitchLoop(20, 0);
+                glitchLoop(20, 10);
                 break;
             case 3:
-                glitchLoop(20, 0);
+                glitchLoop(20, 10);
                 break;
             case 4:
-                glitchLoop(20, 0);
+                glitchLoop(20, 10);
                 break;
         }
     }
@@ -206,22 +196,22 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
         // Core channel: probability roll selects a blocking glitch effect or the default flicker.
         if (random(0, 100) < coreEffectChance) {
             uint8_t flickerSegment = 0;
-            for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_CORE) { flickerSegment = s; break; } }
+            for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_CORE) { flickerSegment = s; break; } }
             switch (random(0, 6)) {
                 case 0:
-                    glitch1(flickerSegment, 700);
+                    coreGlitch1(flickerSegment, 700);
                     break;
                 case 1:
-                    glitch2(swatch[swNum].midtone ,swatch[swNum].contrast, 700);
+                    coreGlitch2(swatch[swNum].midtone ,swatch[swNum].contrast, 700);
                     break;
                 case 2:
-                    glitch3(flickerSegment, swatch[swNum].primary, 20, 3);
+                    coreGlitch3(flickerSegment, swatch[swNum].primary, 20, 3);
                     break;
                 case 3:
-                    glitch4(6, 700);
+                    coreGlitch4(6, 700);
                     break;
                 case 4:
-                    glitch5();
+                    coreGlitch5();
                     break;
                 case 5:
                     fakeMorse(65, 210, 400);
@@ -229,7 +219,7 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
             }
         } else {
             // Default: flicker()'s sendToRGB flushes shiftRegColors[] and Core simultaneously.
-            for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            for (uint8_t seg = 0; seg < coreLEDs; seg++) {
                 if (led[seg].role == ROLE_CORE) {
                     flicker(seg, flickerChance, 200, 255);
                 }
@@ -237,6 +227,7 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
         }
     }
 }
+
 
 // -------------------------------------------------------------------------------------
 // MARK: fadeToColor
@@ -248,7 +239,7 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
     uint8_t output[MAX_LED_SEGMENTS][3];
 
     // Copy handoverColor to startColor for all segments
-    for (uint8_t segment = 0; segment < numLEDs; segment++) {
+    for (uint8_t segment = 0; segment < coreLEDs; segment++) {
         for (int pin = 0; pin < 3; pin++) {
             startColor[segment][pin] = handoverColor[segment][pin];
         }
@@ -263,7 +254,7 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 
         uint8_t fadeRatio = (uint8_t)(((unsigned long)(millis() - startTime) * 255UL) / (unsigned long)fadeTime);
         for (int pin = 0; pin < 3; pin++) {
-            for (uint8_t seg = 0; seg < numLEDs; seg++) {
+            for (uint8_t seg = 0; seg < coreLEDs; seg++) {
                 const uint8_t* target = (led[seg].role == ROLE_CORE) ? color1 : color2;
                 int16_t delta = (int16_t)target[pin] - (int16_t)startColor[seg][pin];
                 output[seg][pin] = (uint8_t)((int16_t)startColor[seg][pin] + (int16_t)(((int32_t)delta * fadeRatio) >> 8));
@@ -271,10 +262,10 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
         }
         // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
         // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
-        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
             if (led[seg].role == ROLE_EXT) sendToRGB(seg, output[seg]);
         }
-        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
             if (led[seg].role == ROLE_CORE) sendToRGB(seg, output[seg]);
         }
     }
@@ -294,10 +285,10 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
         }
         // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
         // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
-        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
             if (led[seg].role == ROLE_EXT) sendToRGB(seg, color2);
         }
-        for (uint8_t seg = 0; seg < numLEDs; seg++) {
+        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
             if (led[seg].role == ROLE_CORE) sendToRGB(seg, color1);
         }
     }
@@ -314,10 +305,10 @@ void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const u
     sendToRGB(pin, outputColor);
     // SR segments buffer only — need a GPIO flush to output. Suppress callback so
     // hand-written SR color is not overwritten, then flush via the ROLE_CORE segment.
-    if (pin < numLEDs && led[pin].isSR) {
+    if (pin < coreLEDs && led[pin].isSR) {
         void (*saved)() = srUpdateCallback;
         srUpdateCallback = nullptr;
-        for (uint8_t s = 0; s < numLEDs; s++) {
+        for (uint8_t s = 0; s < coreLEDs; s++) {
             if (!led[s].isSR) { sendToRGB(s, handoverColor[s]); break; }
         }
         srUpdateCallback = saved;
@@ -325,8 +316,8 @@ void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const u
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: glitch1
-void glitch1(const uint8_t segment, int duration){
+// MARK: coreGlitch1
+void coreGlitch1(const uint8_t segment, int duration){
     uint8_t otherSegment = 0;
     uint8_t flickerTime = 50;
     unsigned long flashStartTime = millis();
@@ -348,8 +339,8 @@ void glitch1(const uint8_t segment, int duration){
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: glitch2
-void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
+// MARK: coreGlitch2
+void coreGlitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
     // Part 1: Rapidly flash between black and background for 1 second
     unsigned long flashStartTime = millis();
     while (millis() - flashStartTime < duration) {
@@ -370,15 +361,15 @@ void glitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: glitch3
-void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
+// MARK: coreGlitch3
+void coreGlitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
     uint8_t startColor[3] = {handoverColor[segment][0], handoverColor[segment][1], handoverColor[segment][2]};
     // Find a representative segment of the opposite role for handover reference
     uint8_t otherSegment = 0;
     if (led[segment].role == ROLE_CORE) {
-        for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_EXT)  { otherSegment = s; break; } }
+        for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_EXT)  { otherSegment = s; break; } }
     } else {
-        for (uint8_t s = 0; s < numLEDs; s++) { if (led[s].role == ROLE_CORE) { otherSegment = s; break; } }
+        for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_CORE) { otherSegment = s; break; } }
     }
     // Hold otherSegment at its handoverColor, and flash segment between startColor and color2 twice
     for (int reps = 0; reps < 3; reps++) {
@@ -398,8 +389,8 @@ void glitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps) {
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: glitch4
-void glitch4(uint8_t reps, int duration) {
+// MARK: coreGlitch4
+void coreGlitch4(uint8_t reps, int duration) {
     uint8_t color[3];
     unsigned long start = millis();
     while (millis() - start < duration) {
@@ -408,7 +399,7 @@ void glitch4(uint8_t reps, int duration) {
             return; // Immediately exit to allow swatch preview to play
         }
 
-        for (uint8_t segment = 0; segment < numLEDs; segment++) {
+        for (uint8_t segment = 0; segment < coreLEDs; segment++) {
             if (led[segment].role == ROLE_EXT) continue;
             gradientPosition(random(1, 255), color);
             for (uint8_t i = 0; i < reps; i++) {
@@ -420,8 +411,8 @@ void glitch4(uint8_t reps, int duration) {
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: glitch5
-void glitch5(){
+// MARK: coreGlitch5
+void coreGlitch5(){
     // Use one of the waveform arrays from waveforms.cpp
     uint8_t waveformIndex = random(0, 2); // Choose between the two available waveforms
     uint8_t outputColor[3];
@@ -520,7 +511,7 @@ void swatchPreview() {
 
         gradientPosition(gradientPos, outputColor);
 
-        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, outputColor); }
+        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, outputColor); }
         sendToRGB(0, outputColor);
 
         delay(fadeUpDuration / fadeUpSteps);
@@ -533,7 +524,7 @@ void swatchPreview() {
 
         gradientPosition(gradientPos, outputColor);
 
-        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, outputColor); }
+        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, outputColor); }
         sendToRGB(0, outputColor);
 
         delay(fadeDownDuration / fadeDownSteps);
@@ -559,12 +550,12 @@ void animationPreview() {
     // Flash the primary color quickly to indicate animation mode change
     for (uint8_t i = 0; i < numFlashes; i++) {
         // Bright flash
-        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, swatch[swNum].primary); }
+        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, swatch[swNum].primary); }
         sendToRGB(0, swatch[swNum].primary);
         delay(flashDuration);
 
         // Dark flash
-        for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, swatch[swNum].background); }
+        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, swatch[swNum].background); }
         sendToRGB(0, swatch[swNum].background);
         delay(flashDuration);
     }
@@ -577,18 +568,36 @@ void animationPreview() {
 }
 
 // -------------------------------------------------------------------------------------
+// MARK: fadeInLevel
+// Returns 0–255 for a linear fade-in: 0 at t=0, 255 at t=duration.
+static inline uint8_t fadeInLevel(unsigned long t, unsigned long duration) {
+    return (t >= duration) ? 255 : (uint8_t)((t * 255UL) / duration);
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: fadeOutLevel
+// Returns 0–255 for a linear fade-out: 255 at t=0, 0 at t=duration.
+static inline uint8_t fadeOutLevel(unsigned long t, unsigned long duration) {
+    return (t >= duration) ? 0 : (uint8_t)(((duration - t) * 255UL) / duration);
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: setSRChannel
+// Blends color against base at the given level (0=base, 255=full color) into shiftRegColors[ch].
+static void setSRChannel(uint8_t ch, const uint8_t* color, const uint8_t* base, uint8_t level) {
+    for (uint8_t c = 0; c < 3; c++)
+        shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * level) / 255);
+}
+
+// -------------------------------------------------------------------------------------
 // MARK: calcPulseLevel
-// Shared double-pulse brightness envelope used by eyeDoublePulse (both modes).
+// Double-pulse brightness envelope: P1 rise 50 ms → P1 fall 70 ms → P2 rise 50 ms → P2 slow fall 400 ms.
 // pt = milliseconds into the 570 ms pulse window. Returns 0–255.
-// Pulse shape: P1 rise 50 ms, P1 fall 70 ms, P2 rise 50 ms, P2 slow fall 400 ms.
 static uint8_t calcPulseLevel(unsigned long pt) {
-    if (pt < 50UL)  return (uint8_t)((pt * 255UL) / 50UL);           // P1 rise
-    pt -= 50UL;
-    if (pt < 70UL)  return (uint8_t)(((70UL - pt) * 255UL) / 70UL);  // P1 fall
-    pt -= 70UL;
-    if (pt < 50UL)  return (uint8_t)((pt * 255UL) / 50UL);           // P2 rise
-    pt -= 50UL;
-    if (pt < 400UL) return (uint8_t)(((400UL - pt) * 255UL) / 400UL); // P2 fall
+    if (pt < 50UL)  return fadeInLevel(pt, 50UL);            pt -= 50UL;  // P1 rise
+    if (pt < 70UL)  return fadeOutLevel(pt, 70UL);           pt -= 70UL;  // P1 fall
+    if (pt < 50UL)  return fadeInLevel(pt, 50UL);            pt -= 50UL;  // P2 rise
+    if (pt < 400UL) return fadeOutLevel(pt, 400UL);                        // P2 slow fall
     return 0;
 }
 
@@ -599,64 +608,78 @@ static uint8_t calcPulseLevel(unsigned long pt) {
 //   mode 1 — Pair:   ch0/ch2 (SR1/SR3) fire first, then ch1/ch3 (SR2/SR4).
 //   mode 2 — Mirror: left eye (ch0/ch1) vs right eye (ch2/ch3), cycling between
 //             in-phase and anti-phase every 3 s.
-// Writes directly to shiftRegColors[]; call this then sendToRGB(0, ...) to flush.
+// Writes to shiftRegColors[] via setSRChannel; call this then sendToRGB(0, ...) to flush.
 void eyeDoublePulse() {
     const bool mirrorMode = (animationMode == 2);
 
-    static uint8_t       baseFlicker       = 0;
-    static unsigned long lastFlickerSample = 0;
-    // Mirror sub-mode state (unused in mode 1)
-    static bool          mirrorInPhase     = true;
-    static unsigned long modeStartTime     = 0;
+    static bool          mirrorInPhase = true;
+    static unsigned long modeStartTime = 0;
 
     unsigned long now = millis();
 
-    // Mirror sub-mode toggle every 3 s
+    // Ripple background for inactive channels (mirrors eyeRipple logic)
+    const uint8_t rPhaseOffset[4] = {0, 8, 16, 24};
+    uint8_t       rBaseIdx = (uint8_t)((now % 1200UL) * 32UL / 1200UL);
+
+    // Mirror phase alternates every 3 s
     if (modeStartTime == 0) modeStartTime = now;
     if (now - modeStartTime >= 3000UL) { mirrorInPhase = !mirrorInPhase; modeStartTime = now; }
 
-    // Shimmer floor — updated at most once per 50 ms so it's visible rather than per-frame noise
-    if (now - lastFlickerSample >= 50UL) { baseFlicker = (uint8_t)random(0, 22); lastFlickerSample = now; }
-
-    const uint8_t* base = swatch[swNum].contrast;
-
     if (mirrorMode) {
-        // Mode 2: left eye (ch0/ch1) vs right eye (ch2/ch3) — in-phase or anti-phase
-        const unsigned long CYCLE_MS = 790UL; // 570 ms pulse + 220 ms gap
-        unsigned long t      = now % CYCLE_MS;
-        unsigned long tRight = mirrorInPhase ? t : (t + CYCLE_MS / 2) % CYCLE_MS;
-        uint8_t lvlLeft  = calcPulseLevel(t);
-        uint8_t lvlRight = calcPulseLevel(tRight);
+        // Mode 2 — left eye (ch0/ch1) vs right eye (ch2/ch3), in-phase or anti-phase
+        const unsigned long PULSE_MS = 570UL;
+        const unsigned long CYCLE_MS = PULSE_MS + 220UL; // 790 ms total
+        unsigned long tLeft  = now % CYCLE_MS;
+        unsigned long tRight = mirrorInPhase ? tLeft : (tLeft + CYCLE_MS / 2) % CYCLE_MS;
         for (uint8_t ch = 0; ch < 4; ch++) {
-            bool isLeft = (ch < 2);
-            const uint8_t* color = isLeft ? swatch[swNum].primary : swatch[swNum].accent;
-            uint8_t lvl = isLeft ? lvlLeft : lvlRight;
-            if (lvl == 0) lvl = baseFlicker;
-            for (uint8_t c = 0; c < 3; c++)
-                shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * lvl) / 255);
+            unsigned long tCh = (ch < 2) ? tLeft : tRight;
+            uint8_t lvl = (tCh < PULSE_MS) ? calcPulseLevel(tCh) : waveform[1].waveform[(rBaseIdx + rPhaseOffset[ch]) % 32];
+            uint8_t gradColor[3];
+            gradientPosition(lvl, gradColor);
+            for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = gradColor[c];
         }
     } else {
-        // Mode 1: SR1/SR3 (ch0/ch2) fire first, then SR2/SR4 (ch1/ch3)
-        const unsigned long PAIR_MS  = 570UL;
-        const unsigned long CYCLE_MS = (PAIR_MS + 220UL) * 2; // 1580 ms
+        // Mode 1 — pair A (ch0/ch2) pulses first, then pair B (ch1/ch3)
+        const unsigned long PULSE_MS = 570UL;
+        const unsigned long CYCLE_MS = (PULSE_MS + 220UL) * 2; // 1580 ms
         unsigned long t = now % CYCLE_MS;
-        uint8_t brightness = 0;
-        int8_t  activePair = -1;
-        if (t < PAIR_MS) {
-            activePair = 0; brightness = calcPulseLevel(t);
-        } else if (t < PAIR_MS + 220UL) {
-            activePair = -1;
-        } else if (t < PAIR_MS * 2 + 220UL) {
-            activePair = 1; brightness = calcPulseLevel(t - (PAIR_MS + 220UL));
-        }
+        int8_t  activePair = (t < PULSE_MS)            ?  0
+                           : (t < PULSE_MS + 220UL)     ? -1
+                           : (t < PULSE_MS * 2 + 220UL) ?  1 : -1;
+        unsigned long tOffset = (activePair == 1) ? t - (PULSE_MS + 220UL) : t;
         for (uint8_t ch = 0; ch < 4; ch++) {
-            bool isPairA     = (ch == 0 || ch == 2); // ch0=SR1, ch2=SR3
-            int8_t pairIndex = isPairA ? 0 : 1;
-            const uint8_t* color = isPairA ? swatch[swNum].primary : swatch[swNum].accent;
-            uint8_t lvl = (activePair == pairIndex) ? brightness : baseFlicker;
-            for (uint8_t c = 0; c < 3; c++)
-                shiftRegColors[ch][c] = base[c] + (uint8_t)(((int16_t)(color[c] - base[c]) * lvl) / 255);
+            bool    isPairA = (ch == 0 || ch == 2); // ch0=SR1, ch2=SR3
+            bool    active  = (activePair == (isPairA ? 0 : 1));
+            uint8_t lvl     = active ? calcPulseLevel(tOffset) : waveform[1].waveform[(rBaseIdx + rPhaseOffset[ch]) % 32];
+            uint8_t gradColor[3];
+            gradientPosition(lvl, gradColor);
+            for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = gradColor[c];
         }
+    }
+}
+
+// -------------------------------------------------------------------------------------
+// MARK: eyeRipple
+// Non-blocking traveling-wave animation for the 4 SR eye channels.
+// Uses the sine waveform table (waveform[1]) with per-channel quarter-wave phase offsets
+// so the wave appears to travel ch0 → ch1 → ch2 → ch3.
+// RIPPLE_MS controls the speed of one full cycle.
+void eyeRipple(uint8_t minGrad, uint8_t maxGrad) {
+    const unsigned long RIPPLE_MS        = 1200UL; // ms per full sine cycle
+    const uint8_t       WAVE_STEPS       = 32;
+    const uint8_t       phaseOffset[4]   = {0, 8, 16, 24}; // quarter-wave spacing per channel
+
+    unsigned long now    = millis();
+    uint8_t       baseIdx = (uint8_t)((now % RIPPLE_MS) * WAVE_STEPS / RIPPLE_MS);
+
+    uint8_t numCh = (extLEDs < 4) ? extLEDs : 4;
+    for (uint8_t ch = 0; ch < numCh; ch++) {
+        uint8_t tableIdx = (baseIdx + phaseOffset[ch]) % WAVE_STEPS;
+        uint8_t sineVal  = waveform[1].waveform[tableIdx]; // sine 0–255
+        uint8_t lvl      = minGrad + (uint8_t)(((uint16_t)(maxGrad - minGrad) * sineVal) >> 8);
+        uint8_t gradColor[3];
+        gradientPosition(lvl, gradColor);
+        for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = gradColor[c];
     }
 }
 
@@ -671,7 +694,7 @@ void eyeScatter() {
     static unsigned long nextChange[4] = {0, 0, 0, 0};
 
     unsigned long now  = millis();
-    uint8_t       numCh = (numShiftRegChannels < 4) ? numShiftRegChannels : 4;
+    uint8_t       numCh = (extLEDs < 4) ? extLEDs : 4;
 
     for (uint8_t ch = 0; ch < numCh; ch++) {
         if (now >= nextChange[ch]) {
@@ -708,32 +731,6 @@ void eyeScatter() {
 }
 
 // -------------------------------------------------------------------------------------
-// MARK: updateGlitchEyes
-// Non-blocking SR eye pod dispatcher. Two states:
-//   0 = eyeDoublePulse (default fallback — always runs between scatter events)
-//   1 = eyeScatter     (triggered effect — ~30% chance at each transition)
-// Probability is rolled at each state transition; no hold/dark-pause state.
-// Called from showColor, fadeToColor, glitch4 (when glitchEyeActive), and glitchLoop's main loop.
-void updateGlitchEyes() {
-    static uint8_t       eyeEffect   = 0;  // start on doublePulse
-    static unsigned long eyeChangeAt = 0;
-    unsigned long now = millis();
-    if (now >= eyeChangeAt) {
-        if (random(0, 100) < 30) {
-            eyeEffect   = 1; // eyeScatter — short window
-            eyeChangeAt = now + (unsigned long)random(300, 900);
-        } else {
-            eyeEffect   = 0; // eyeDoublePulse — longer window
-            eyeChangeAt = now + (unsigned long)random(800, 2400);
-        }
-    }
-    switch (eyeEffect) {
-        case 1: eyeScatter();      break;  // SR scatter effect
-        default: eyeDoublePulse(); break;  // eyeDoublePulse fallback (always)
-    }
-}
-
-// -------------------------------------------------------------------------------------
 // MARK: brightnessAdjustmentMode
 void brightnessAdjustmentMode() {
     const int cycleDuration = 4000; // 4 seconds total
@@ -758,7 +755,7 @@ void brightnessAdjustmentMode() {
         // Display white at current brightness on all segments
         // SR segments are suppressed automatically by the brightnessAdjustMode check in sendToRGB
         for (int i = 0; i < 10; i++) { // Display multiple times per step for stability
-            for (uint8_t seg = 1; seg < numLEDs; seg++) { sendToRGB(seg, whiteColor); }
+            for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, whiteColor); }
             sendToRGB(0, whiteColor);
             delay(stepDuration / 10);
         }
