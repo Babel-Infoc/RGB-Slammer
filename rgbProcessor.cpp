@@ -55,19 +55,24 @@ const uint8_t PROGMEM gamma8[] = {
 
 // MARK: Luminance Calculation ------------------------------
 void calculateLuminance() {
-    // Calculate the effective luminance per mA for each LED
-    uint8_t rEfficiency = red.luminance / red.mA;
-    uint8_t gEfficiency = green.luminance / green.mA;
-    uint8_t bEfficiency = blue.luminance / blue.mA;
+    // Calculate output efficiency for each color channel
+    uint16_t rEff = (uint16_t)red.luminance   * 256 / (red.mA   ? red.mA   : 1);
+    uint16_t gEff = (uint16_t)green.luminance * 256 / (green.mA ? green.mA : 1);
+    uint16_t bEff = (uint16_t)blue.luminance  * 256 / (blue.mA  ? blue.mA  : 1);
 
-    // Find the most efficient LED (highest luminance per mA)
-    uint8_t maxEfficiency = max(rEfficiency, max(gEfficiency, bEfficiency));
+    // Select the least efficient channel as the reference
+    uint16_t minEff = min(rEff, min(gEff, bEff));
 
-    // Scale all LEDs DOWN from the most efficient one
-    // This ensures no LED is driven above its baseline
-    tuneRatio[0] = (uint8_t)((rEfficiency / maxEfficiency) * 255);
-    tuneRatio[1] = (uint8_t)((gEfficiency / maxEfficiency) * 255);
-    tuneRatio[2] = (uint8_t)((bEfficiency / maxEfficiency) * 255);
+    // Tune the other colors down by the ratio of their efficiency to the least efficient channel, capping at 255.
+    if (minEff == 0) {
+        tuneRatio[0] = tuneRatio[1] = tuneRatio[2] = 255;
+        return;
+    }
+
+    // More efficient channel → smaller ratio → less output → balanced white.
+    tuneRatio[0] = (uint8_t)min((uint32_t)255, (uint32_t)minEff * 255 / rEff);
+    tuneRatio[1] = (uint8_t)min((uint32_t)255, (uint32_t)minEff * 255 / gEff);
+    tuneRatio[2] = (uint8_t)min((uint32_t)255, (uint32_t)minEff * 255 / bEff);
 }
 
 // MARK: Button Handling ------------------------------

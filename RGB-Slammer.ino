@@ -1,11 +1,7 @@
-/*
-RGB Slammer
-Written by Tully Jagoe 2025
-MIT License
+// RGB Slammer
+// Written by Tully Jagoe 2026
 
-This script is best edited in VSCode for color token selection in swatches.cpp
-*/
-
+// This script is best edited in VSCode for color token selection in swatches.cpp
 
 #include <Arduino.h>
 #include "types.h"
@@ -30,19 +26,18 @@ shiftRegPins shiftReg;
 uint8_t coreLEDs = 0;
 uint8_t extLEDs = 0;
 
-// Brightness stored as 8-bit fixed-point: 0-255 = 0.0-1.0.
-// Default 0.40 → 102; pulse preview 0.65 → 166.
-uint8_t currentBrightness = 120;
+// Brightness 0-255
+uint8_t currentBrightness = 180;
 // Temporary brightness value used when previewing a new swatch
-uint8_t pulseBrightness = 150;
+uint8_t pulseBrightness = 255;
 
 // Individual section brightness adjustment
 uint8_t coreOutputScale = 100;
 uint8_t srOutputScale   = 255;
 
 // Brightness adjustment mode limits (0-255 fixed-point: 0.30→77, 0.60→153)
-const uint8_t minBrightness = 75;
-const uint8_t maxBrightness = 150;
+const uint8_t minBrightness = 60;
+const uint8_t maxBrightness = 180;
 const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
 bool brightnessAdjustMode = false;
 
@@ -53,12 +48,15 @@ const uint8_t slowDown = 1;
 // Define the light intensity of each LED color at the specified mA value
 // Check your LEDs datasheet for typical luminosity values for standard forward current
 // {mA, luminosity}
-const luminance red       = {5, 100};
+const luminance red       = {5, 110};
 const luminance green     = {5, 100};
 const luminance blue      = {5, 100};
 
-
 extern void (*srUpdateCallback)(); // defined in rgbProcessor.cpp
+
+// Forward declarations
+void fadeToColor(const uint8_t color1[3], uint8_t brightness1, const uint8_t color2[3], uint8_t brightness2, const int fadeTime);
+void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_t brightness2, int duration);
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
@@ -108,10 +106,9 @@ void setup() {
     // Try to load saved settings from flash
     if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 14;
+        swNum = 15;
         animationMode = 0;
     }
-
 
     // Show the bootup animation
     bounceBoot(40);
@@ -139,8 +136,8 @@ void loop() {
         switch (animationMode) {
             case 0:
             default:
-                //glitchLoop(20, 10);
-                cautionCitizen();
+                glitchLoop(10, 10);
+                //cautionCitizen();
                 break;
             case 1:
                 cautionCitizen();
@@ -167,14 +164,14 @@ void loop() {
 void bounceBoot(int speed){
     for (uint8_t reps = 0; reps < 3; reps++) {
         if (reps == 2) speed = speed * 3;
-        fadeToColor(swatch[swNum].primary,      swatch[swNum].background,   speed);
-        fadeToColor(swatch[swNum].accent,       swatch[swNum].primary,      speed);
-        fadeToColor(swatch[swNum].midtone,      swatch[swNum].accent,       speed);
-        fadeToColor(swatch[swNum].contrast,     swatch[swNum].midtone,      speed);
-        fadeToColor(swatch[swNum].background,   swatch[swNum].contrast,     speed);
-        fadeToColor(swatch[swNum].background,   swatch[swNum].background,   speed);
+        fadeToColor(swatch[swNum].primary,      255,    swatch[swNum].background,   100,    speed);
+        fadeToColor(swatch[swNum].accent,       220,    swatch[swNum].primary,      255,    speed);
+        fadeToColor(swatch[swNum].midtone,      180,    swatch[swNum].accent,       220,    speed);
+        fadeToColor(swatch[swNum].contrast,     150,    swatch[swNum].midtone,      180,    speed);
+        fadeToColor(swatch[swNum].background,   100,    swatch[swNum].contrast,     150,    speed);
+        fadeToColor(swatch[swNum].background,   100,    swatch[swNum].background,   100,    speed);
     }
-    showColor(swatch[0].background, swatch[0].background, speed*5);
+    showColor(swatch[0].background, 0, swatch[0].background, 0, speed*5);
 }
 
 // -------------------------------------------------------------------------------------
@@ -219,10 +216,16 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
                     break;
             }
         } else {
-            // Default: flicker()'s sendToRGB flushes shiftRegColors[] and Core simultaneously.
-            for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-                if (led[seg].role == ROLE_CORE) {
-                    flicker(seg, flickerChance, 200, 255);
+            // Default: flicker for a duration before the next probability roll.
+            // Without this loop, each flicker() call takes ~1 ms and the glitch dice
+            // would re-roll thousands of times per second, making effects fire constantly.
+            unsigned long flickerEnd = millis() + 200;
+            while (millis() < flickerEnd) {
+                if (swatchPreviewActive || animationPreviewActive) return;
+                for (uint8_t seg = 0; seg < coreLEDs; seg++) {
+                    if (led[seg].role == ROLE_CORE) {
+                        flicker(seg, flickerChance, 200, 255);
+                    }
                 }
             }
         }
@@ -230,7 +233,7 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
 }
 
 // No-arg wrapper: ripple between contrast and background — used as srUpdateCallback idle in cautionCitizen.
-static void cautionRipple() { eyeRipple(192, 255); }
+static void cautionRipple() { eyeRipple(0, 50, 100); }
 
 // -------------------------------------------------------------------------------------
 // MARK: cautionCitizen
@@ -259,8 +262,8 @@ void cautionCitizen() {
             srUpdateCallback = nullptr;
             for (uint8_t i = 0; i < STROBE_REPS; i++) {
                 if (swatchPreviewActive || animationPreviewActive) break;
-                showColor(swatch[swNum].accent,   swatch[swNum].primary,   FLASH_ON_MS);
-                showColor(swatch[swNum].contrast, swatch[swNum].contrast,  FLASH_OFF_MS);
+                showColor(swatch[swNum].accent,   255,    swatch[swNum].primary,   255,    FLASH_ON_MS);
+                showColor(swatch[swNum].contrast, 255,    swatch[swNum].contrast,  255,    FLASH_OFF_MS);
             }
             lastStrobeTime = millis();
             srUpdateCallback = cautionRipple;
@@ -277,7 +280,7 @@ void cautionCitizen() {
 // color1 → ROLE_CORE segments, color2 → ROLE_EXT segments.
 // If srUpdateCallback is set, it runs during the ROLE_CORE flush and overrides color2 for SR.
 // Set srUpdateCallback = nullptr before calling to drive ROLE_EXT directly with color2.
-void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fadeTime){
+void fadeToColor(const uint8_t color1[3], uint8_t brightness1, const uint8_t color2[3], uint8_t brightness2, const int fadeTime){
     uint8_t startColor[MAX_LED_SEGMENTS][3];
     uint8_t output[MAX_LED_SEGMENTS][3];
 
@@ -298,9 +301,12 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
         uint8_t fadeRatio = (uint8_t)(((unsigned long)(millis() - startTime) * 255UL) / (unsigned long)fadeTime);
         for (int pin = 0; pin < 3; pin++) {
             for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-                const uint8_t* target = (led[seg].role == ROLE_CORE) ? color1 : color2;
+                bool isCore = (led[seg].role == ROLE_CORE);
+                const uint8_t* target = isCore ? color1 : color2;
+                uint8_t bri = isCore ? brightness1 : brightness2;
                 int16_t delta = (int16_t)target[pin] - (int16_t)startColor[seg][pin];
-                output[seg][pin] = (uint8_t)((int16_t)startColor[seg][pin] + (int16_t)(((int32_t)delta * fadeRatio) >> 8));
+                uint8_t blended = (uint8_t)((int16_t)startColor[seg][pin] + (int16_t)(((int32_t)delta * fadeRatio) >> 8));
+                output[seg][pin] = (uint8_t)(((uint16_t)blended * bri) >> 8);
             }
         }
         // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
@@ -319,7 +325,12 @@ void fadeToColor(const uint8_t color1[3], const uint8_t color2[3], const int fad
 // color1 → ROLE_CORE segments, color2 → ROLE_EXT segments.
 // If srUpdateCallback is set, it runs during the ROLE_CORE flush and overrides color2 for SR.
 // Set srUpdateCallback = nullptr before calling to drive ROLE_EXT directly with color2.
-void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
+void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_t brightness2, int duration){
+    uint8_t out1[3], out2[3];
+    for (uint8_t c = 0; c < 3; c++) {
+        out1[c] = (uint8_t)(((uint16_t)color1[c] * brightness1) >> 8);
+        out2[c] = (uint8_t)(((uint16_t)color2[c] * brightness2) >> 8);
+    }
     unsigned long startTime = millis();
     while (millis() - startTime < duration) {
         // Check if swatch preview should interrupt this animation
@@ -329,10 +340,10 @@ void showColor(uint8_t color1[3], uint8_t color2[3], int duration){
         // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
         // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
         for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-            if (led[seg].role == ROLE_EXT) sendToRGB(seg, color2);
+            if (led[seg].role == ROLE_EXT) sendToRGB(seg, out2);
         }
         for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-            if (led[seg].role == ROLE_CORE) sendToRGB(seg, color1);
+            if (led[seg].role == ROLE_CORE) sendToRGB(seg, out1);
         }
     }
 }
@@ -372,11 +383,11 @@ void coreGlitch1(const uint8_t segment, int duration){
 
         // Animate the active segment; the opposite role always holds contrast
         if (led[segment].role == ROLE_CORE) {
-            showColor(swatch[swNum].accent,      swatch[swNum].contrast, 50);
-            showColor(swatch[swNum].background,  swatch[swNum].contrast, 50);
+            showColor(swatch[swNum].accent,      220,    swatch[swNum].contrast, 150,    50);
+            showColor(swatch[swNum].background,  100,    swatch[swNum].contrast, 150,    50);
         } else {
-            showColor(swatch[swNum].contrast, swatch[swNum].accent,      50);
-            showColor(swatch[swNum].contrast, swatch[swNum].background,  50);
+            showColor(swatch[swNum].contrast, 150,    swatch[swNum].accent,      220,    50);
+            showColor(swatch[swNum].contrast, 150,    swatch[swNum].background,  100,    50);
         }
     }
 }
@@ -391,16 +402,16 @@ void coreGlitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
         if (swatchPreviewActive) {
             return; // Immediately exit to allow swatch preview to play
         }
-        rapidPulse(color1, color2, 50);
+        rapidPulse(color1, color2, 255, 50);
     }
 
     // Part 2: Rapidly fade core through all swatch colors; eyes hold contrast throughout
     uint8_t fadeTime = 50;
-    fadeToColor(swatch[swNum].background,   swatch[swNum].contrast, fadeTime);
-    fadeToColor(swatch[swNum].contrast,     swatch[swNum].contrast, fadeTime);
-    fadeToColor(swatch[swNum].midtone,      swatch[swNum].contrast, fadeTime);
-    fadeToColor(swatch[swNum].accent,       swatch[swNum].contrast, fadeTime);
-    fadeToColor(swatch[swNum].primary,      swatch[swNum].contrast, fadeTime);
+    fadeToColor(swatch[swNum].background,   50,     swatch[swNum].contrast,     100,    fadeTime);
+    fadeToColor(swatch[swNum].contrast,     100,    swatch[swNum].contrast,     100,    fadeTime);
+    fadeToColor(swatch[swNum].midtone,      150,    swatch[swNum].contrast,     100,    fadeTime);
+    fadeToColor(swatch[swNum].accent,       200,    swatch[swNum].contrast,     100,    fadeTime);
+    fadeToColor(swatch[swNum].primary,      255,    swatch[swNum].contrast,     100,    fadeTime);
 }
 
 // -------------------------------------------------------------------------------------
@@ -422,11 +433,11 @@ void coreGlitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps
         }
 
         if (led[segment].role == ROLE_CORE) {
-            showColor(startColor, handoverColor[otherSegment], duration);
-            showColor(color2, handoverColor[otherSegment], duration);
+            showColor(startColor, 255, handoverColor[otherSegment], 255, duration);
+            showColor(color2, 255, handoverColor[otherSegment], 255, duration);
         } else {
-            showColor(handoverColor[otherSegment], startColor, duration);
-            showColor(handoverColor[otherSegment], color2, duration);
+            showColor(handoverColor[otherSegment], 255, startColor, 255, duration);
+            showColor(handoverColor[otherSegment], 255, color2, 255, duration);
         }
     }
 }
@@ -471,12 +482,12 @@ void coreGlitch5(){
         gradientPosition(waveform[waveformIndex].waveform[i], outputColor);
 
         // Show this color on the core LED; eyes hold contrast
-        showColor(outputColor, swatch[swNum].contrast, 50);
+        showColor(outputColor, 255, swatch[swNum].contrast, 150, 50);
 
         // Brief black flash on core every few steps for a glitchy effect
         if (i % 4 == 0) {
             uint8_t blackColor[3] = {0, 0, 0};
-            showColor(blackColor, swatch[swNum].contrast, 10);
+            showColor(blackColor, 255, swatch[swNum].contrast, 150, 10);
         }
     }
 
@@ -489,22 +500,22 @@ void coreGlitch5(){
 
         uint8_t randomPos = random(0, 32);
         gradientPosition(waveform[waveformIndex].waveform[randomPos], outputColor);
-        showColor(outputColor, swatch[swNum].contrast, 30);
+        showColor(outputColor, 255, swatch[swNum].contrast, 150, 30);
 
         // Brief flashes to black between jumps
         uint8_t blackColor[3] = {0, 0, 0};
-        showColor(blackColor, swatch[swNum].contrast, 15);
+        showColor(blackColor, 255, swatch[swNum].contrast, 150, 15);
     }
 
     // End with a final dramatic fade to black on core; eyes hold contrast
-    fadeToColor(swatch[swNum].background, swatch[swNum].contrast, 300);
+    fadeToColor(swatch[swNum].background,   100,   swatch[swNum].midtone,   200,     300);
 }
 
 // -------------------------------------------------------------------------------------
 // MARK: rapidPulse
-void rapidPulse(uint8_t color1[3], uint8_t color2[3], int speed){
-    showColor(color1, color2, speed); // core = color1, eye = color2
-    showColor(color2, color2, speed); // core = color2, eye = color2
+void rapidPulse(uint8_t color1[3], uint8_t color2[3], uint8_t brightness, int speed){
+    showColor(color1, brightness, color2, brightness, speed); // core = color1, eye = color2
+    showColor(color2, brightness, color2, brightness, speed); // core = color2, eye = color2
 }
 
 // -------------------------------------------------------------------------------------
@@ -526,11 +537,11 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
         int selection = random(0, 3);
         // Core flickers between gradient positions; eyes hold contrast throughout
         if (selection == 0) {
-            showColor(output1, swatch[swNum].contrast, interval);
+            showColor(output1, 60, swatch[swNum].contrast, 150, interval);
         } else if (selection == 1) {
-            showColor(output2, swatch[swNum].contrast, interval);
+            showColor(output2, 60, swatch[swNum].contrast, 150, interval);
         } else {
-            showColor(output1, swatch[swNum].contrast, interval);
+            showColor(output1, 60, swatch[swNum].contrast, 150, interval);
         }
     }
 }
@@ -655,14 +666,13 @@ static uint8_t calcPulseLevel(unsigned long pt) {
 void eyeDoublePulse() {
     const bool mirrorMode = (animationMode == 2);
 
+    const uint8_t flickerMin = 140;  // Minimum background flicker brightness (0-255)
+    const uint8_t flickerMax = 160;  // Maximum background flicker brightness (0-255)
+
     static bool          mirrorInPhase = true;
     static unsigned long modeStartTime = 0;
 
     unsigned long now = millis();
-
-    // Ripple background for inactive channels (mirrors eyeRipple logic)
-    const uint8_t rPhaseOffset[4] = {0, 8, 16, 24};
-    uint8_t       rBaseIdx = (uint8_t)((now % 1200UL) * 32UL / 1200UL);
 
     // Mirror phase alternates every 3 s
     if (modeStartTime == 0) modeStartTime = now;
@@ -674,29 +684,44 @@ void eyeDoublePulse() {
         const unsigned long CYCLE_MS = PULSE_MS + 220UL; // 790 ms total
         unsigned long tLeft  = now % CYCLE_MS;
         unsigned long tRight = mirrorInPhase ? tLeft : (tLeft + CYCLE_MS / 2) % CYCLE_MS;
+        uint8_t flickerBri = (uint8_t)random(flickerMin, flickerMax + 1);
         for (uint8_t ch = 0; ch < 4; ch++) {
             unsigned long tCh = (ch < 2) ? tLeft : tRight;
-            uint8_t lvl = (tCh < PULSE_MS) ? calcPulseLevel(tCh) : waveform[1].waveform[(rBaseIdx + rPhaseOffset[ch]) % 32];
-            uint8_t gradColor[3];
-            gradientPosition(lvl, gradColor);
-            for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = gradColor[c];
+            bool isPulse = (tCh < PULSE_MS);
+            if (isPulse) {
+                uint8_t lvl = calcPulseLevel(tCh);
+                uint8_t gradColor[3];
+                gradientPosition(lvl, gradColor);
+                uint8_t bri = flickerMax + (uint8_t)(((uint16_t)(255 - flickerMax) * lvl) >> 8);
+                for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = (uint8_t)(((uint16_t)gradColor[c] * bri) >> 8);
+            } else {
+                for (uint8_t c = 0; c < 3; c++)
+                    shiftRegColors[ch][c] = (uint8_t)(((uint16_t)swatch[swNum].background[c] * flickerBri) >> 8);
+            }
         }
     } else {
         // Mode 1 — pair A (ch0/ch2) pulses first, then pair B (ch1/ch3)
         const unsigned long PULSE_MS = 570UL;
         const unsigned long CYCLE_MS = (PULSE_MS + 220UL) * 2; // 1580 ms
         unsigned long t = now % CYCLE_MS;
-        int8_t  activePair = (t < PULSE_MS)            ?  0
-                           : (t < PULSE_MS + 220UL)     ? -1
-                           : (t < PULSE_MS * 2 + 220UL) ?  1 : -1;
+        int8_t  activePair  = (t < PULSE_MS)            ?  0
+                            : (t < PULSE_MS + 220UL)     ? -1
+                            : (t < PULSE_MS * 2 + 220UL) ?  1 : -1;
         unsigned long tOffset = (activePair == 1) ? t - (PULSE_MS + 220UL) : t;
+        uint8_t flickerBri = (uint8_t)random(flickerMin, flickerMax + 1);
         for (uint8_t ch = 0; ch < 4; ch++) {
-            bool    isPairA = (ch == 0 || ch == 2); // ch0=SR1, ch2=SR3
-            bool    active  = (activePair == (isPairA ? 0 : 1));
-            uint8_t lvl     = active ? calcPulseLevel(tOffset) : waveform[1].waveform[(rBaseIdx + rPhaseOffset[ch]) % 32];
-            uint8_t gradColor[3];
-            gradientPosition(lvl, gradColor);
-            for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = gradColor[c];
+            bool isPairA = (ch == 0 || ch == 2); // ch0=SR1, ch2=SR3
+            bool active  = (activePair == (isPairA ? 0 : 1));
+            if (active) {
+                uint8_t lvl = calcPulseLevel(tOffset);
+                uint8_t gradColor[3];
+                gradientPosition(lvl, gradColor);
+                uint8_t bri = flickerMax + (uint8_t)(((uint16_t)(255 - flickerMax) * lvl) >> 8);
+                for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = (uint8_t)(((uint16_t)gradColor[c] * bri) >> 8);
+            } else {
+                for (uint8_t c = 0; c < 3; c++)
+                    shiftRegColors[ch][c] = (uint8_t)(((uint16_t)swatch[swNum].background[c] * flickerBri) >> 8);
+            }
         }
     }
 }
@@ -707,7 +732,7 @@ void eyeDoublePulse() {
 // Uses the sine waveform table (waveform[1]) with per-channel quarter-wave phase offsets
 // so the wave appears to travel ch0 → ch1 → ch2 → ch3.
 // RIPPLE_MS controls the speed of one full cycle.
-void eyeRipple(uint8_t minGrad, uint8_t maxGrad) {
+void eyeRipple(uint8_t minGrad, uint8_t maxGrad, uint8_t brightness) {
     const unsigned long RIPPLE_MS        = 1200UL; // ms per full sine cycle
     const uint8_t       WAVE_STEPS       = 32;
     const uint8_t       phaseOffset[4]   = {0, 8, 16, 24}; // quarter-wave spacing per channel
@@ -722,7 +747,7 @@ void eyeRipple(uint8_t minGrad, uint8_t maxGrad) {
         uint8_t lvl      = minGrad + (uint8_t)(((uint16_t)(maxGrad - minGrad) * sineVal) >> 8);
         uint8_t gradColor[3];
         gradientPosition(lvl, gradColor);
-        for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = gradColor[c];
+        for (uint8_t c = 0; c < 3; c++) shiftRegColors[ch][c] = (uint8_t)(((uint16_t)gradColor[c] * brightness) >> 8);
     }
 }
 
@@ -732,6 +757,13 @@ void eyeRipple(uint8_t minGrad, uint8_t maxGrad) {
 // Each of the 4 SR channels has its own per-channel timer and independently picks random
 // swatch colours and brightness levels.
 void eyeScatter() {
+    // Per-slot brightness cap (0-255): applied to the color before blending to background
+    const uint8_t brightPrimary    = 255;
+    const uint8_t brightAccent     = 100;
+    const uint8_t brightMidtone    = 50;
+    const uint8_t brightContrast   = 50;
+    const uint8_t brightBackground = 50;
+
     static uint8_t       colorSlot[4]  = {3, 0, 1, 2};
     static uint8_t       level[4]      = {80, 60, 120, 40};
     static unsigned long nextChange[4] = {0, 0, 0, 0};
@@ -760,14 +792,18 @@ void eyeScatter() {
             }
         }
         const uint8_t* color;
+        uint8_t bright;
         switch (colorSlot[ch]) {
-            case 0:  color = swatch[swNum].primary;    break;
-            case 1:  color = swatch[swNum].accent;     break;
-            case 2:  color = swatch[swNum].midtone;    break;
-            case 3:  color = swatch[swNum].contrast;   break;
-            default: color = swatch[swNum].background; break;
+            case 0:  color = swatch[swNum].primary;    bright = brightPrimary;    break;
+            case 1:  color = swatch[swNum].accent;     bright = brightAccent;     break;
+            case 2:  color = swatch[swNum].midtone;    bright = brightMidtone;    break;
+            case 3:  color = swatch[swNum].contrast;   bright = brightContrast;   break;
+            default: color = swatch[swNum].background; bright = brightBackground; break;
         }
-        setSRChannel(ch, color, swatch[swNum].background, level[ch]);
+        uint8_t scaledColor[3];
+        for (uint8_t c = 0; c < 3; c++)
+            scaledColor[c] = (uint8_t)(((uint16_t)color[c] * bright) >> 8);
+        setSRChannel(ch, scaledColor, swatch[swNum].background, level[ch]);
     }
 }
 
