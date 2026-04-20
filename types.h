@@ -5,6 +5,9 @@
 // Maximum total LED segments across all hardware configurations (GPIO + SR)
 #define MAX_LED_SEGMENTS 5
 
+// Sentinel value meaning "no pin assigned" — safe because CH32V003 valid pin numbers are well below 255
+#define PIN_NONE 0xFF
+
 // MARK: ------------------------------ Hardware structure definitions ------------------------------
 // LED segment role — determines which animation colour target a segment belongs to
 #define ROLE_CORE 0   // Directly-driven GPIO LED (core)
@@ -48,8 +51,7 @@ struct luminance {
 // Brightness and luminance globals — 8-bit fixed-point: 0-255 represents 0.0-1.0
 extern uint8_t currentBrightness;
 extern uint8_t pulseBrightness;
-extern uint8_t coreOutputScale; // Post-gamma output scale for GPIO segments (0-255)
-extern uint8_t srOutputScale;   // Post-gamma output scale for SR segments (0-255)
+extern uint8_t segOutputScale[MAX_LED_SEGMENTS]; // Per-segment post-gamma output scale (0-255)
 extern const luminance red;
 extern const luminance green;
 extern const luminance blue;

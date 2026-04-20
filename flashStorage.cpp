@@ -7,10 +7,12 @@
 // Define the flash page to use for settings storage
 // CH32V003 has 16KB flash total, program code typically takes < 10KB
 // Use a page near the end but leave some safety margin
-// Flash page size is 64 bytes on CH32V003, not 1KB
+// Use the very last 64-byte page of flash for settings.
+// 16KB flash ends at 0x08004000; last page = 0x08004000 - 0x40 = 0x08003FC0.
+// Placing settings here maximises separation from program code and avoids
+// the crash caused by FLASH_ErasePage overwriting program instructions.
 #define FLASH_PAGE_SIZE 64
-// Use address at 14KB mark (0x08003800), well away from program code
-#define FLASH_SETTINGS_PAGE_ADDR 0x08003800
+#define FLASH_SETTINGS_PAGE_ADDR 0x08003FC0
 
 // Calculate checksum for settings
 uint8_t calculateChecksum(const FlashSettings* settings) {

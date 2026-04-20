@@ -77,6 +77,11 @@ void calculateLuminance() {
 
 // MARK: Button Handling ------------------------------
 void checkButtons() {
+    // Don't process button events while a preview animation is playing.
+    // sendToRGB calls checkButtons on every PWM frame, so without this guard
+    // a button release detected mid-animation would advance swNum a second time.
+    if (swatchPreviewActive || animationPreviewActive) return;
+
     if (debounceStart > 0) {
         debounceStart--;
     } else {
@@ -91,15 +96,12 @@ void checkButtons() {
             } else {
                 // Button just released
                 if (!buttonHeldFor2Seconds) {
-                    // Short press - change swatch
+                    // Short press - change swatch (flash save deferred to end of swatchPreview)
                     swNum = (swNum + 1) % numSwatches;
-                    saveSettingsToFlash(swNum, currentBrightness, animationMode);
                     swatchPreviewActive = true;
                 } else {
-                    // Long press was released - exit brightness mode and save brightness
+                    // Long press was released - exit brightness mode (flash save deferred to end of brightnessAdjustmentMode)
                     brightnessAdjustMode = false;
-                    // Save both swatch and current brightness to flash
-                    saveSettingsToFlash(swNum, currentBrightness, animationMode);
                 }
                 buttonHeldFor2Seconds = false;
             }
@@ -112,17 +114,18 @@ void checkButtons() {
             }
         }
 
-        // Check animation button
-        uint8_t animButtonState = digitalRead(animBtn);
+        // Check animation button (skipped when no button is wired to this config)
+        if (animBtn != PIN_NONE) {
+            uint8_t animButtonState = digitalRead(animBtn);
 
-        if (animButtonState != animButtonLastState) {
-            if (animButtonState == LOW) {
-                // Button just pressed - cycle to next animation mode
-                animationMode = (animationMode + 1) % numAnimationModes;
-                saveSettingsToFlash(swNum, currentBrightness, animationMode);
-                animationPreviewActive = true;
+            if (animButtonState != animButtonLastState) {
+                if (animButtonState == LOW) {
+                    // Button just pressed - cycle to next animation mode (flash save deferred to end of animationPreview)
+                    animationMode = (animationMode + 1) % numAnimationModes;
+                    animationPreviewActive = true;
+                }
+                animButtonLastState = animButtonState;
             }
-            animButtonLastState = animButtonState;
         }
 
         // Restart the debounce timer
@@ -183,23 +186,30 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
         memset(shiftRegColors, 0, sizeof(shiftRegColors));
     }
 
-    // Gamma-correct the direct segment colour, then apply per-type output scale.
+    // Gamma-correct the direct segment colour, then apply per-segment output scale.
     // 8-bit fixed-point scaling: scaled = (a * b) >> 8  (0-255 × 0-255 → 0-255).
     uint8_t tunedRGB[3];
+    uint8_t coreScale = (segment < MAX_LED_SEGMENTS) ? segOutputScale[segment] : 255;
     for (uint8_t pin = 0; pin < 3; pin++) {
         uint8_t adj   = (uint8_t)(((uint16_t)rgbValue[pin]               * tuneRatio[pin])    >> 8);
         adj           = (uint8_t)(((uint16_t)adj                         * currentBrightness) >> 8);
-        tunedRGB[pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * coreOutputScale)   >> 8);
+        tunedRGB[pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * coreScale)         >> 8);
     }
 
-    // Gamma-correct all SR channel colours, then apply per-type output scale.
+    // Gamma-correct all SR channel colours, then apply per-segment output scale.
+    // Build a per-channel scale lookup from segOutputScale via the led[] array.
     uint8_t tunedSR[4][3];
     if (extLEDs > 0) {
+        uint8_t srChanScale[4] = {255, 255, 255, 255};
+        for (uint8_t s = 0; s < coreLEDs; s++) {
+            if (led[s].isSR && led[s].srChannel < 4)
+                srChanScale[led[s].srChannel] = segOutputScale[s];
+        }
         for (uint8_t ch = 0; ch < 4; ch++) {
             for (uint8_t pin = 0; pin < 3; pin++) {
                 uint8_t adj      = (uint8_t)(((uint16_t)shiftRegColors[ch][pin] * tuneRatio[pin])    >> 8);
                 adj              = (uint8_t)(((uint16_t)adj                     * currentBrightness) >> 8);
-                tunedSR[ch][pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * srOutputScale) >> 8);
+                tunedSR[ch][pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * srChanScale[ch]) >> 8);
             }
         }
     }

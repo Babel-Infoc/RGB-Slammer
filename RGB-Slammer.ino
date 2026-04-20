@@ -13,7 +13,7 @@
 // Number of directly-driven LED segments (set from active hardware config at boot)
 
 // Select which hardware configuration to use
-ConfigType activeConfig = NANOFRAME;
+ConfigType activeConfig = AURORA_GLASYA;
 
 // Define the LED array and button pins according to the active configuration
 ledSegment led[MAX_LED_SEGMENTS];
@@ -27,17 +27,17 @@ uint8_t coreLEDs = 0;
 uint8_t extLEDs = 0;
 
 // Brightness 0-255
-uint8_t currentBrightness = 180;
+uint8_t currentBrightness = 200;
 // Temporary brightness value used when previewing a new swatch
 uint8_t pulseBrightness = 255;
 
-// Individual section brightness adjustment
-uint8_t coreOutputScale = 100;
-uint8_t srOutputScale   = 255;
+// Per-segment output scale (0-255, post-gamma). Index matches led[] array.
+// Segs 0-1 are typically GPIO (default 100); segs 2-4 are typically SR (default 255).
+uint8_t segOutputScale[MAX_LED_SEGMENTS] = {100, 255, 255, 255, 255};
 
 // Brightness adjustment mode limits (0-255 fixed-point: 0.30→77, 0.60→153)
 const uint8_t minBrightness = 60;
-const uint8_t maxBrightness = 180;
+const uint8_t maxBrightness = 200;
 const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
 bool brightnessAdjustMode = false;
 
@@ -98,7 +98,7 @@ void setup() {
     }
     // Set up the buttons
     pinMode(colorBtn, INPUT_PULLUP);
-    pinMode(animBtn, INPUT_PULLUP);
+    if (animBtn != PIN_NONE) pinMode(animBtn, INPUT_PULLUP);
 
     // Calculate the luminosity modifiers
     calculateLuminance();
@@ -106,7 +106,7 @@ void setup() {
     // Try to load saved settings from flash
     if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
         // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 15;
+        swNum = 11;
         animationMode = 0;
     }
 
@@ -183,7 +183,7 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
     const uint8_t flickerChance = 70;     // Chance (0-100) that a given frame will have a Core glitch effect instead of default flicker
     while (true) {
         // Exit immediately on any preview interrupt
-        if (swatchPreviewActive || animationPreviewActive) {
+        if (swatchPreviewActive || animationPreviewActive || brightnessAdjustMode) {
             return;
         }
 
@@ -221,10 +221,17 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
             // would re-roll thousands of times per second, making effects fire constantly.
             unsigned long flickerEnd = millis() + 200;
             while (millis() < flickerEnd) {
-                if (swatchPreviewActive || animationPreviewActive) return;
+                if (swatchPreviewActive || animationPreviewActive || brightnessAdjustMode) return;
+                // Non-SR ROLE_EXT segments flicker independently.
+                for (uint8_t seg = 0; seg < coreLEDs; seg++) {
+                    if (led[seg].role == ROLE_EXT && !led[seg].isSR) {
+                        flicker(seg, flickerChance, 180, 200, 5);
+                    }
+                }
                 for (uint8_t seg = 0; seg < coreLEDs; seg++) {
                     if (led[seg].role == ROLE_CORE) {
-                        flicker(seg, flickerChance, 200, 255);
+                        // Seg 0 → primary (0), Seg 1 → background (4)
+                        flicker(seg, flickerChance, 180, 200, (seg == 1 ? 1 : 4));
                     }
                 }
             }
@@ -255,13 +262,13 @@ void cautionCitizen() {
     srUpdateCallback = cautionRipple;
 
     while (true) {
-        if (swatchPreviewActive || animationPreviewActive) return;
+        if (swatchPreviewActive || animationPreviewActive || brightnessAdjustMode) return;
 
         if (millis() - lastStrobeTime >= STROBE_INTERVAL_MS) {
             // Strobe burst: null callback so showColor drives SR directly
             srUpdateCallback = nullptr;
             for (uint8_t i = 0; i < STROBE_REPS; i++) {
-                if (swatchPreviewActive || animationPreviewActive) break;
+                if (swatchPreviewActive || animationPreviewActive || brightnessAdjustMode) break;
                 showColor(swatch[swNum].accent,   255,    swatch[swNum].primary,   255,    FLASH_ON_MS);
                 showColor(swatch[swNum].contrast, 255,    swatch[swNum].contrast,  255,    FLASH_OFF_MS);
             }
@@ -269,7 +276,7 @@ void cautionCitizen() {
             srUpdateCallback = cautionRipple;
         } else {
             // Idle: flicker drives the core flush; cautionRipple callback animates SR
-            flicker(coreSeg, 70, 200, 255);
+            flicker(coreSeg, 70, 100, 150, 5);
         }
     }
 }
@@ -293,9 +300,9 @@ void fadeToColor(const uint8_t color1[3], uint8_t brightness1, const uint8_t col
 
     unsigned long startTime = millis();
     while (millis() - startTime < fadeTime) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
 
         uint8_t fadeRatio = (uint8_t)(((unsigned long)(millis() - startTime) * 255UL) / (unsigned long)fadeTime);
@@ -333,9 +340,9 @@ void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_
     }
     unsigned long startTime = millis();
     while (millis() - startTime < duration) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
         // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
         // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
@@ -350,12 +357,25 @@ void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_
 
 // -------------------------------------------------------------------------------------
 // MARK: flicker
-// Works for any segment role. If pin is an SR segment, suppresses srUpdateCallback
-// and triggers a ROLE_CORE flush so the buffered SR color is output immediately.
-void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const uint8_t max){
+// Flickers a segment by scaling a swatch color by a random brightness in [min, max].
+// swatchIndex selects which swatch color to use:
+//   0=primary  1=accent  2=midtone  3=contrast  4=background  5=random
+// If pin is an SR segment, suppresses srUpdateCallback and triggers a ROLE_CORE flush
+// so the buffered SR color is output immediately.
+void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const uint8_t max, const uint8_t swatchIndex){
     uint8_t outputColor[3];
-    uint8_t range = random(min, max);
-    gradientPosition(range, outputColor);
+    uint8_t brightness = random(min, max);
+    const uint8_t* colorChoices[5] = {
+        swatch[swNum].primary,
+        swatch[swNum].accent,
+        swatch[swNum].midtone,
+        swatch[swNum].contrast,
+        swatch[swNum].background
+    };
+    uint8_t idx = (swatchIndex >= 5) ? (uint8_t)random(0, 5) : swatchIndex;
+    const uint8_t* baseColor = colorChoices[idx];
+    for (uint8_t c = 0; c < 3; c++)
+        outputColor[c] = (uint8_t)(((uint16_t)baseColor[c] * brightness) >> 8);
     sendToRGB(pin, outputColor);
     // SR segments buffer only — need a GPIO flush to output. Suppress callback so
     // hand-written SR color is not overwritten, then flush via the ROLE_CORE segment.
@@ -376,18 +396,18 @@ void coreGlitch1(const uint8_t segment, int duration){
     uint8_t flickerTime = 50;
     unsigned long flashStartTime = millis();
     while (millis() - flashStartTime < duration) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
 
         // Animate the active segment; the opposite role always holds contrast
         if (led[segment].role == ROLE_CORE) {
-            showColor(swatch[swNum].accent,      220,    swatch[swNum].contrast, 150,    50);
-            showColor(swatch[swNum].background,  100,    swatch[swNum].contrast, 150,    50);
+            showColor(swatch[swNum].accent,      255,    swatch[swNum].contrast, 100,    50);
+            showColor(swatch[swNum].background,   70,    swatch[swNum].contrast, 100,    50);
         } else {
-            showColor(swatch[swNum].contrast, 150,    swatch[swNum].accent,      220,    50);
-            showColor(swatch[swNum].contrast, 150,    swatch[swNum].background,  100,    50);
+            showColor(swatch[swNum].contrast, 100,    swatch[swNum].accent,      255,    50);
+            showColor(swatch[swNum].contrast, 100,    swatch[swNum].background,   70,    50);
         }
     }
 }
@@ -398,9 +418,9 @@ void coreGlitch2(uint8_t color1[3], uint8_t color2[3], int duration) {
     // Part 1: Rapidly flash between black and background for 1 second
     unsigned long flashStartTime = millis();
     while (millis() - flashStartTime < duration) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
         rapidPulse(color1, color2, 255, 50);
     }
@@ -427,9 +447,9 @@ void coreGlitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps
     }
     // Hold otherSegment at its handoverColor, and flash segment between startColor and color2 twice
     for (int reps = 0; reps < 3; reps++) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
 
         if (led[segment].role == ROLE_CORE) {
@@ -448,9 +468,9 @@ void coreGlitch4(uint8_t reps, int duration) {
     uint8_t color[3];
     unsigned long start = millis();
     while (millis() - start < duration) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
 
         for (uint8_t segment = 0; segment < coreLEDs; segment++) {
@@ -473,38 +493,38 @@ void coreGlitch5(){
 
     // First play through the waveform once
     for (uint8_t i = 0; i < 32; i++) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
 
         // Get color at this position in the gradient
         gradientPosition(waveform[waveformIndex].waveform[i], outputColor);
 
         // Show this color on the core LED; eyes hold contrast
-        showColor(outputColor, 255, swatch[swNum].contrast, 150, 50);
+        showColor(outputColor, 255, swatch[swNum].contrast, 100, 50);
 
         // Brief black flash on core every few steps for a glitchy effect
         if (i % 4 == 0) {
             uint8_t blackColor[3] = {0, 0, 0};
-            showColor(blackColor, 255, swatch[swNum].contrast, 150, 10);
+            showColor(blackColor, 255, swatch[swNum].contrast, 100, 10);
         }
     }
 
     // Then do some rapid random jumps between waveform positions
     for (uint8_t i = 0; i < 8; i++) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
 
         uint8_t randomPos = random(0, 32);
         gradientPosition(waveform[waveformIndex].waveform[randomPos], outputColor);
-        showColor(outputColor, 255, swatch[swNum].contrast, 150, 30);
+        showColor(outputColor, 255, swatch[swNum].contrast, 100, 30);
 
         // Brief flashes to black between jumps
         uint8_t blackColor[3] = {0, 0, 0};
-        showColor(blackColor, 255, swatch[swNum].contrast, 150, 15);
+        showColor(blackColor, 255, swatch[swNum].contrast, 100, 15);
     }
 
     // End with a final dramatic fade to black on core; eyes hold contrast
@@ -529,9 +549,9 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
 
     unsigned long start = millis();
     while (millis() - start < duration) {
-        // Check if swatch preview should interrupt this animation
-        if (swatchPreviewActive) {
-            return; // Immediately exit to allow swatch preview to play
+        // Check if swatch preview or brightness mode should interrupt this animation
+        if (swatchPreviewActive || brightnessAdjustMode) {
+            return;
         }
 
         int selection = random(0, 3);
@@ -550,7 +570,7 @@ void fakeMorse(uint8_t color1, uint8_t color2, int duration) {
 // MARK: swatchPreview
 void swatchPreview() {
     const uint8_t fadeUpDuration = 50; // 0.2 seconds fade up
-    const uint8_t fadeDownDuration = 400; // 0.6 seconds fade down
+    const uint16_t fadeDownDuration = 400; // 0.6 seconds fade down
     const uint8_t fadeUpSteps = 20; // Steps for fade up
     const uint8_t fadeDownSteps = 60; // Steps for fade down
 
@@ -587,6 +607,9 @@ void swatchPreview() {
     // Restore original brightness
     currentBrightness = originalBrightness;
 
+    // Save deferred from button handler — flash erase here is safe outside the PWM loop
+    saveSettingsToFlash(swNum, currentBrightness, animationMode);
+
     // Reset the flag
     swatchPreviewActive = false;
 }
@@ -601,6 +624,8 @@ void animationPreview() {
     uint8_t originalBrightness = currentBrightness;
     currentBrightness = pulseBrightness;
 
+    showColor(swatch[swNum].background, 0, swatch[swNum].background, 0, 200); // Blank all LEDs briefly to better mark the swatch pulse start
+
     // Flash the primary color quickly to indicate animation mode change
     for (uint8_t i = 0; i < numFlashes; i++) {
         // Bright flash
@@ -614,8 +639,13 @@ void animationPreview() {
         delay(flashDuration);
     }
 
+    showColor(swatch[swNum].background, 0, swatch[swNum].background, 0, 200); // Same again here
+
     // Restore original brightness
     currentBrightness = originalBrightness;
+
+    // Save deferred from button handler — flash erase here is safe outside the PWM loop
+    saveSettingsToFlash(swNum, currentBrightness, animationMode);
 
     // Reset the flag
     animationPreviewActive = false;
@@ -837,6 +867,9 @@ void brightnessAdjustmentMode() {
             delay(stepDuration / 10);
         }
     }
+    // Save deferred from button handler — flash erase here is safe outside the PWM loop
+    saveSettingsToFlash(swNum, currentBrightness, animationMode);
+
     // Reset mode flag
     brightnessAdjustMode = false;
 }

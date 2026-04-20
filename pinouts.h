@@ -54,14 +54,14 @@ const PinConfig NANOFRAME_PINOUT = {
 // Configuration for Aurora Glasya
 const PinConfig AURORA_GLASYA_PINOUT = {
     .leds = {
-        {PC4, PC5, PC6, false, 0, ROLE_CORE}, // Seg 0: Upper LEDs
-        {PD4, PD5, PD3, false, 0, ROLE_CORE}, // Seg 1: Lower LEDs
+        {PC4, PC5, PC6, false, 0, ROLE_CORE}, // Seg 0: Upper LEDs (primary color)
+        {PD4, PD5, PD3, false, 0, ROLE_EXT},  // Seg 1: Lower LEDs (secondary color)
     },
     .coreLEDs = 2,
     .shiftReg    = {0, 0, 0},
     .shiftRegChannels = 0,
     .colorButton = PD2,
-    .animButton = PC7
+    .animButton = PIN_NONE  // No animation button on this hardware
 };
 
 // Configuration for Blinder Mini
