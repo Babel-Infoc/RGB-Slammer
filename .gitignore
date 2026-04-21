@@ -1,4 +1,5 @@
-.vscode
+.vscode/
 .github
 /build
 /.build
+.vscode/arduino.json
