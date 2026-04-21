@@ -138,7 +138,7 @@ void checkButtons() {
 // MARK: Shift Register Output ------------------------------
 // Reference to shift register globals defined in the main sketch
 extern shiftRegPins shiftReg;
-extern uint8_t extLEDs;
+extern uint8_t srLEDs;
 
 // Current colors for each shift register channel (up to 4)
 uint8_t shiftRegColors[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
@@ -156,11 +156,11 @@ void (*srUpdateCallback)() = nullptr;
 //   SR segment    — buffers the colour into shiftRegColors[]; the buffer is output on the
 //                    next GPIO segment’s PWM frame, keeping all outputs in temporal sync.
 // Call SR segments before the GPIO segment within one animation step for zero lag.
-extern uint8_t coreLEDs;
+extern uint8_t gpioLEDs;
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // Always record this colour as the handover value for transition animations
-    if (segment < coreLEDs) {
+    if (segment < gpioLEDs) {
         for (uint8_t i = 0; i < 3; i++) {
             handoverColor[segment][i] = rgbValue[i];
         }
@@ -168,7 +168,7 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
     // SR segment: buffer the colour and return early.
     // It will be clocked out during the next GPIO segment’s PWM frame.
-    if (segment < coreLEDs && led[segment].isSR) {
+    if (segment < gpioLEDs && led[segment].isSR) {
         uint8_t ch = led[segment].srChannel;
         for (uint8_t i = 0; i < 3; i++) {
             shiftRegColors[ch][i] = rgbValue[i];
@@ -182,7 +182,7 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     if (srUpdateCallback) srUpdateCallback();
 
     // Brightness adjustment mode: suppress SR output — pods show black
-    if (brightnessAdjustMode && extLEDs > 0) {
+    if (brightnessAdjustMode && srLEDs > 0) {
         memset(shiftRegColors, 0, sizeof(shiftRegColors));
     }
 
@@ -199,9 +199,9 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     // Gamma-correct all SR channel colours, then apply per-segment output scale.
     // Build a per-channel scale lookup from segOutputScale via the led[] array.
     uint8_t tunedSR[4][3];
-    if (extLEDs > 0) {
+    if (srLEDs > 0) {
         uint8_t srChanScale[4] = {255, 255, 255, 255};
-        for (uint8_t s = 0; s < coreLEDs; s++) {
+        for (uint8_t s = 0; s < gpioLEDs; s++) {
             if (led[s].isSR && led[s].srChannel < 4)
                 srChanScale[led[s].srChannel] = segOutputScale[s];
         }
@@ -218,16 +218,19 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     // Direct segment: active-HIGH (LOW = on).
     // SR channels:    active-LOW  (HIGH = off) — bytes start 0xFF, bits CLEARED to turn on.
     // QG/QH of SR1 (BTN1/BTN2) never cleared — remain HIGH at all times.
+    // SR bytes are only re-clocked when they change, reducing shiftOut calls from
+    // 200/frame to at most 26/frame (one initial clock + up to 12 threshold crossings).
+    uint8_t prev_sr1 = 0, prev_sr2 = 0; // initialised to 0 so first iteration always clocks
     for (int brightness = 0; brightness < 100; brightness++) {
 
         // Drive direct LED only for valid segments
-        if (segment < coreLEDs) {
+        if (segment < gpioLEDs) {
             digitalWrite(led[segment].red,   brightness < tunedRGB[0] ? LOW : HIGH);
             digitalWrite(led[segment].green, brightness < tunedRGB[1] ? LOW : HIGH);
             digitalWrite(led[segment].blue,  brightness < tunedRGB[2] ? LOW : HIGH);
         }
 
-        if (extLEDs > 0) {
+        if (srLEDs > 0) {
             uint8_t sr1Byte = 0xFF; // U19: bits 0-5 = LEDs, bits 6-7 = BTN1/BTN2 (stay HIGH)
             uint8_t sr2Byte = 0xFF; // U20: bits 0-5 = LEDs, bits 6-7 unused (stay HIGH)
 
@@ -247,20 +250,25 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
             if (brightness < tunedSR[3][1]) sr2Byte &= ~(1 << 4); // QE = GREEN4
             if (brightness < tunedSR[3][2]) sr2Byte &= ~(1 << 5); // QF = BLUE4
 
-            digitalWrite(shiftReg.rclk, LOW);
-            shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr2Byte); // U20 first
-            shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr1Byte); // U19 second
-            digitalWrite(shiftReg.rclk, HIGH);
+            // Only re-clock SR when bytes have changed (saves ~186 shiftOut calls/frame)
+            if (sr1Byte != prev_sr1 || sr2Byte != prev_sr2) {
+                prev_sr1 = sr1Byte;
+                prev_sr2 = sr2Byte;
+                digitalWrite(shiftReg.rclk, LOW);
+                shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr2Byte); // U20 first
+                shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr1Byte); // U19 second
+                digitalWrite(shiftReg.rclk, HIGH);
+            }
         }
     }
 
     // Return all outputs to idle-off after the PWM frame
-    if (segment < coreLEDs) {
+    if (segment < gpioLEDs) {
         digitalWrite(led[segment].red,   HIGH);
         digitalWrite(led[segment].green, HIGH);
         digitalWrite(led[segment].blue,  HIGH);
     }
-    if (extLEDs > 0) {
+    if (srLEDs > 0) {
         digitalWrite(shiftReg.rclk, LOW);
         shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
         shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
@@ -275,10 +283,10 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
 
 // MARK: Role-based output ------------------------------
 // Convenience wrapper: calls sendToRGB for every segment whose role matches.
-// For correct SR/GPIO ordering the caller should invoke ROLE_EXT first (SR buffer),
-// then ROLE_CORE (triggers the PWM frame that flushes the SR buffer).
+// For correct SR/GPIO ordering the caller should invoke ROLE_SR first (SR buffer),
+// then ROLE_GPIO (triggers the PWM frame that flushes the SR buffer).
 void sendToRole(uint8_t role, const uint8_t color[3]) {
-    for (uint8_t seg = 0; seg < coreLEDs; seg++) {
+    for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
         if (led[seg].role == role) {
             sendToRGB(seg, color);
         }

@@ -10,8 +10,8 @@
 
 // MARK: ------------------------------ Hardware structure definitions ------------------------------
 // LED segment role — determines which animation colour target a segment belongs to
-#define ROLE_CORE 0   // Directly-driven GPIO LED (core)
-#define ROLE_EXT  1   // Shift-register eye pod
+#define ROLE_GPIO 0   // LEDs attached directly to GPIO pins, driven by software PWM in sendToRGB()
+#define ROLE_SR   1   // LEDs attached to shift registers, driven by hardware PWM via shift register channel color buffers and srUpdateCallback()
 
 // Struct for LED segment definition
 struct ledSegment {
@@ -20,7 +20,7 @@ struct ledSegment {
     uint8_t blue;
     bool    isSR;      // true = driven via shift register, false = direct GPIO
     uint8_t srChannel; // shift register channel index (ignored when isSR = false)
-    uint8_t role;      // ROLE_CORE or ROLE_EXT
+    uint8_t role;      // ROLE_GPIO or ROLE_SR
 };
 
 // Struct for shift register pin configuration
@@ -36,11 +36,11 @@ extern ledSegment led[];
 // Pin definitions
 extern uint8_t colorBtn;
 extern uint8_t animBtn;
-extern uint8_t coreLEDs;
+extern uint8_t gpioLEDs;
 
 // Shift register configuration
 extern shiftRegPins shiftReg;
-extern uint8_t extLEDs;
+extern uint8_t srLEDs;
 
 // LED luminance information
 struct luminance {
@@ -48,20 +48,40 @@ struct luminance {
     uint8_t luminance;
 };
 
+// Hardware pin and tuning configuration for one target platform
+struct PinConfig {
+    ledSegment leds[MAX_LED_SEGMENTS]; // GPIO segments
+    uint8_t gpioLEDs;                  // Number of GPIO LED segments
+    shiftRegPins shiftReg;             // Shift register control pins (SER, RCLK, SRCLK)
+    uint8_t shiftRegChannels;          // Number of RGB LED channels on the shift register (0 = none)
+    uint8_t colorButton;
+    uint8_t animButton;
+    // Hardware-specific brightness and LED tuning
+    uint8_t defaultBrightness;                // Initial brightness on boot (0-255)
+    uint8_t pulseBrightness;                  // Brightness used during preview animations (0-255)
+    uint8_t segOutputScale[MAX_LED_SEGMENTS]; // Per-segment post-gamma output scale (0-255)
+    uint8_t minBrightness;                    // Lower limit for brightness adjust mode (0-255)
+    uint8_t maxBrightness;                    // Upper limit for brightness adjust mode (0-255)
+    uint8_t slowDown;                         // PWM loop delay in ms
+    luminance redLed;                         // Red LED luminance calibration {mA, luminosity}
+    luminance greenLed;                       // Green LED luminance calibration {mA, luminosity}
+    luminance blueLed;                        // Blue LED luminance calibration {mA, luminosity}
+};
+
 // Brightness and luminance globals — 8-bit fixed-point: 0-255 represents 0.0-1.0
 extern uint8_t currentBrightness;
 extern uint8_t pulseBrightness;
 extern uint8_t segOutputScale[MAX_LED_SEGMENTS]; // Per-segment post-gamma output scale (0-255)
-extern const luminance red;
-extern const luminance green;
-extern const luminance blue;
+extern luminance red;   // Initialised from active hardware config at boot
+extern luminance green;
+extern luminance blue;
 
 // MARK: ------------------------------ Global variables ------------------------------
 // Handover color — one entry per segment (GPIO + SR)
 extern uint8_t handoverColor[MAX_LED_SEGMENTS][3];
 
-// CPU slowdown
-extern const uint8_t slowDown;
+// CPU slowdown — initialised from active hardware config at boot
+extern uint8_t slowDown;
 
 // MARK: ------------------------------ Button handling ------------------------------
 // Current color swatch

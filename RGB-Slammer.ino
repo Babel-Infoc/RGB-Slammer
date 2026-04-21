@@ -8,12 +8,10 @@
 #include "swatches.h"
 #include "waveforms.h"
 #include "flashStorage.h"
-#include "pinouts.h"
-
-// Number of directly-driven LED segments (set from active hardware config at boot)
-
-// Select which hardware configuration to use
-ConfigType activeConfig = AURORA_GLASYA;
+// Select from the active hardware configuration options in hardware.h
+// That file stores all GPIO pin assignments, brightness tuning, and LED calibration values.
+#define ACTIVE_CONFIG CONFIG_BREACH_KEY
+#include "hardware.h"
 
 // Define the LED array and button pins according to the active configuration
 ledSegment led[MAX_LED_SEGMENTS];
@@ -23,61 +21,64 @@ uint8_t animBtn;
 // Shift register pin configuration
 shiftRegPins shiftReg;
 // Initialise LED channels (will be updated during boot based on active config)
-uint8_t coreLEDs = 0;
-uint8_t extLEDs = 0;
+uint8_t gpioLEDs = 0;
+uint8_t srLEDs = 0;
 
-// Brightness 0-255
-uint8_t currentBrightness = 200;
+// Brightness 0-255 (initialised from active hardware config at boot; overridden by flash if saved)
+uint8_t currentBrightness;
 // Temporary brightness value used when previewing a new swatch
-uint8_t pulseBrightness = 255;
+uint8_t pulseBrightness;
 
-// Per-segment output scale (0-255, post-gamma). Index matches led[] array.
-// Segs 0-1 are typically GPIO (default 100); segs 2-4 are typically SR (default 255).
-uint8_t segOutputScale[MAX_LED_SEGMENTS] = {100, 255, 255, 255, 255};
+// Per-segment output scale (0-255, post-gamma). Initialised from active hardware config at boot.
+uint8_t segOutputScale[MAX_LED_SEGMENTS];
 
-// Brightness adjustment mode limits (0-255 fixed-point: 0.30→77, 0.60→153)
-const uint8_t minBrightness = 60;
-const uint8_t maxBrightness = 200;
+// Brightness adjustment mode limits
+uint8_t minBrightness;
+uint8_t maxBrightness;
 const unsigned long brightnessModeTriggerTime = 500; // milliseconds to hold button to enter brightness mode
 bool brightnessAdjustMode = false;
 
-// Slow down all animations by this amou nt (in milliseconds)
-const uint8_t slowDown = 1;
+// PWM loop delay in milliseconds
+uint8_t slowDown;
 
-// LED Color tuning
-// Define the light intensity of each LED color at the specified mA value
-// Check your LEDs datasheet for typical luminosity values for standard forward current
-// {mA, luminosity}
-const luminance red       = {5, 110};
-const luminance green     = {5, 100};
-const luminance blue      = {5, 100};
+// LED luminance calibration
+luminance red;
+luminance green;
+luminance blue;
 
 extern void (*srUpdateCallback)(); // defined in rgbProcessor.cpp
-
-// Forward declarations
-void fadeToColor(const uint8_t color1[3], uint8_t brightness1, const uint8_t color2[3], uint8_t brightness2, const int fadeTime);
-void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_t brightness2, int duration);
 
 // -------------------------------------------------------------------------------------
 // MARK: Setup
 void setup() {
     // Get the active configuration using the case-based approach
-    const PinConfig& config = getActiveConfig(activeConfig);
+    const PinConfig& config = getActiveConfig();
 
     // Copy pin configuration from the selected hardware profile
-    for (uint8_t i = 0; i < config.coreLEDs && i < MAX_LED_SEGMENTS; i++) {
+    for (uint8_t i = 0; i < config.gpioLEDs && i < MAX_LED_SEGMENTS; i++) {
         led[i] = config.leds[i];
     }
-    coreLEDs  = config.coreLEDs;
+    gpioLEDs  = config.gpioLEDs;
     colorBtn = config.colorButton;
     animBtn  = config.animButton;
 
     // Copy shift register configuration
-    shiftReg            = config.shiftReg;
-    extLEDs = config.shiftRegChannels;
+    shiftReg = config.shiftReg;
+    srLEDs  = config.shiftRegChannels;
+
+    // Copy hardware-specific brightness and LED tuning from active config
+    currentBrightness = config.defaultBrightness;
+    pulseBrightness   = config.pulseBrightness;
+    for (uint8_t i = 0; i < MAX_LED_SEGMENTS; i++) segOutputScale[i] = config.segOutputScale[i];
+    minBrightness = config.minBrightness;
+    maxBrightness = config.maxBrightness;
+    slowDown      = config.slowDown;
+    red           = config.redLed;
+    green         = config.greenLed;
+    blue          = config.blueLed;
 
     // Set up all LED segments (GPIO only — SR segments have no pins to configure)
-    for (uint8_t segment = 0; segment < coreLEDs; segment++) {
+    for (uint8_t segment = 0; segment < gpioLEDs; segment++) {
         if (!led[segment].isSR) {
             pinMode(led[segment].red, OUTPUT);
             pinMode(led[segment].green, OUTPUT);
@@ -86,7 +87,7 @@ void setup() {
     }
 
     // Set up shift register pins if configured
-    if (extLEDs > 0) {
+    if (srLEDs > 0) {
         pinMode(shiftReg.ser,   OUTPUT);
         pinMode(shiftReg.rclk,  OUTPUT);
         pinMode(shiftReg.srclk, OUTPUT);
@@ -100,14 +101,14 @@ void setup() {
     pinMode(colorBtn, INPUT_PULLUP);
     if (animBtn != PIN_NONE) pinMode(animBtn, INPUT_PULLUP);
 
-    // Calculate the luminosity modifiers
+    // Automatic white balance
     calculateLuminance();
 
-    // Try to load saved settings from flash
+    // Try to load saved settings from flash; currentBrightness falls back to hardware default if none saved
     if (!loadSettingsFromFlash(&swNum, &currentBrightness, &animationMode)) {
-        // If no valid settings found, use defaults (which are already set in declarations)
-        swNum = 11;
-        animationMode = 0;
+        swNum             = 0;
+        currentBrightness = config.defaultBrightness;
+        animationMode     = 0;
     }
 
     // Show the bootup animation
@@ -194,7 +195,7 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
         // Core channel: probability roll selects a blocking glitch effect or the default flicker.
         if (random(0, 100) < coreEffectChance) {
             uint8_t flickerSegment = 0;
-            for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_CORE) { flickerSegment = s; break; } }
+            for (uint8_t s = 0; s < gpioLEDs; s++) { if (led[s].role == ROLE_GPIO) { flickerSegment = s; break; } }
             switch (random(0, 6)) {
                 case 0:
                     coreGlitch1(flickerSegment, 700);
@@ -222,14 +223,14 @@ void glitchLoop(const uint8_t coreEffectChance, const uint8_t srEffectChance) {
             unsigned long flickerEnd = millis() + 200;
             while (millis() < flickerEnd) {
                 if (swatchPreviewActive || animationPreviewActive || brightnessAdjustMode) return;
-                // Non-SR ROLE_EXT segments flicker independently.
-                for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-                    if (led[seg].role == ROLE_EXT && !led[seg].isSR) {
+                // Non-SR ROLE_SR segments flicker independently.
+                for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
+                    if (led[seg].role == ROLE_SR && !led[seg].isSR) {
                         flicker(seg, flickerChance, 180, 200, 5);
                     }
                 }
-                for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-                    if (led[seg].role == ROLE_CORE) {
+                for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
+                    if (led[seg].role == ROLE_GPIO) {
                         // Seg 0 → primary (0), Seg 1 → background (4)
                         flicker(seg, flickerChance, 180, 200, (seg == 1 ? 1 : 4));
                     }
@@ -257,7 +258,7 @@ void cautionCitizen() {
     if (lastStrobeTime == 0) lastStrobeTime = millis();
 
     uint8_t coreSeg = 0;
-    for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_CORE) { coreSeg = s; break; } }
+    for (uint8_t s = 0; s < gpioLEDs; s++) { if (led[s].role == ROLE_GPIO) { coreSeg = s; break; } }
 
     srUpdateCallback = cautionRipple;
 
@@ -284,15 +285,15 @@ void cautionCitizen() {
 
 // -------------------------------------------------------------------------------------
 // MARK: fadeToColor
-// color1 → ROLE_CORE segments, color2 → ROLE_EXT segments.
-// If srUpdateCallback is set, it runs during the ROLE_CORE flush and overrides color2 for SR.
-// Set srUpdateCallback = nullptr before calling to drive ROLE_EXT directly with color2.
+// color1 → ROLE_GPIO segments, color2 → ROLE_SR segments.
+// If srUpdateCallback is set, it runs during the ROLE_GPIO flush and overrides color2 for SR.
+// Set srUpdateCallback = nullptr before calling to drive ROLE_SR directly with color2.
 void fadeToColor(const uint8_t color1[3], uint8_t brightness1, const uint8_t color2[3], uint8_t brightness2, const int fadeTime){
     uint8_t startColor[MAX_LED_SEGMENTS][3];
     uint8_t output[MAX_LED_SEGMENTS][3];
 
     // Copy handoverColor to startColor for all segments
-    for (uint8_t segment = 0; segment < coreLEDs; segment++) {
+    for (uint8_t segment = 0; segment < gpioLEDs; segment++) {
         for (int pin = 0; pin < 3; pin++) {
             startColor[segment][pin] = handoverColor[segment][pin];
         }
@@ -307,8 +308,8 @@ void fadeToColor(const uint8_t color1[3], uint8_t brightness1, const uint8_t col
 
         uint8_t fadeRatio = (uint8_t)(((unsigned long)(millis() - startTime) * 255UL) / (unsigned long)fadeTime);
         for (int pin = 0; pin < 3; pin++) {
-            for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-                bool isCore = (led[seg].role == ROLE_CORE);
+            for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
+                bool isCore = (led[seg].role == ROLE_GPIO);
                 const uint8_t* target = isCore ? color1 : color2;
                 uint8_t bri = isCore ? brightness1 : brightness2;
                 int16_t delta = (int16_t)target[pin] - (int16_t)startColor[seg][pin];
@@ -316,22 +317,22 @@ void fadeToColor(const uint8_t color1[3], uint8_t brightness1, const uint8_t col
                 output[seg][pin] = (uint8_t)(((uint16_t)blended * bri) >> 8);
             }
         }
-        // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
-        // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
-        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-            if (led[seg].role == ROLE_EXT) sendToRGB(seg, output[seg]);
+        // SR-first: buffer ROLE_SR color2, then ROLE_GPIO flush sends both.
+        // If srUpdateCallback is set it fires during the ROLE_GPIO flush and overrides the buffer.
+        for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
+            if (led[seg].role == ROLE_SR) sendToRGB(seg, output[seg]);
         }
-        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-            if (led[seg].role == ROLE_CORE) sendToRGB(seg, output[seg]);
+        for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
+            if (led[seg].role == ROLE_GPIO) sendToRGB(seg, output[seg]);
         }
     }
 }
 
 // -------------------------------------------------------------------------------------
 // MARK: showColor
-// color1 → ROLE_CORE segments, color2 → ROLE_EXT segments.
-// If srUpdateCallback is set, it runs during the ROLE_CORE flush and overrides color2 for SR.
-// Set srUpdateCallback = nullptr before calling to drive ROLE_EXT directly with color2.
+// color1 → ROLE_GPIO segments, color2 → ROLE_SR segments.
+// If srUpdateCallback is set, it runs during the ROLE_GPIO flush and overrides color2 for SR.
+// Set srUpdateCallback = nullptr before calling to drive ROLE_SR directly with color2.
 void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_t brightness2, int duration){
     uint8_t out1[3], out2[3];
     for (uint8_t c = 0; c < 3; c++) {
@@ -344,13 +345,13 @@ void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_
         if (swatchPreviewActive || brightnessAdjustMode) {
             return;
         }
-        // SR-first: buffer ROLE_EXT color2, then ROLE_CORE flush sends both.
-        // If srUpdateCallback is set it fires during the ROLE_CORE flush and overrides the buffer.
-        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-            if (led[seg].role == ROLE_EXT) sendToRGB(seg, out2);
+        // SR-first: buffer ROLE_SR color2, then ROLE_GPIO flush sends both.
+        // If srUpdateCallback is set it fires during the ROLE_GPIO flush and overrides the buffer.
+        for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
+            if (led[seg].role == ROLE_SR) sendToRGB(seg, out2);
         }
-        for (uint8_t seg = 0; seg < coreLEDs; seg++) {
-            if (led[seg].role == ROLE_CORE) sendToRGB(seg, out1);
+        for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
+            if (led[seg].role == ROLE_GPIO) sendToRGB(seg, out1);
         }
     }
 }
@@ -360,7 +361,7 @@ void showColor(uint8_t color1[3], uint8_t brightness1, uint8_t color2[3], uint8_
 // Flickers a segment by scaling a swatch color by a random brightness in [min, max].
 // swatchIndex selects which swatch color to use:
 //   0=primary  1=accent  2=midtone  3=contrast  4=background  5=random
-// If pin is an SR segment, suppresses srUpdateCallback and triggers a ROLE_CORE flush
+// If pin is an SR segment, suppresses srUpdateCallback and triggers a ROLE_GPIO flush
 // so the buffered SR color is output immediately.
 void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const uint8_t max, const uint8_t swatchIndex){
     uint8_t outputColor[3];
@@ -378,11 +379,11 @@ void flicker(const uint8_t pin, const uint8_t chance, const uint8_t min, const u
         outputColor[c] = (uint8_t)(((uint16_t)baseColor[c] * brightness) >> 8);
     sendToRGB(pin, outputColor);
     // SR segments buffer only — need a GPIO flush to output. Suppress callback so
-    // hand-written SR color is not overwritten, then flush via the ROLE_CORE segment.
-    if (pin < coreLEDs && led[pin].isSR) {
+    // hand-written SR color is not overwritten, then flush via the ROLE_GPIO segment.
+    if (pin < gpioLEDs && led[pin].isSR) {
         void (*saved)() = srUpdateCallback;
         srUpdateCallback = nullptr;
-        for (uint8_t s = 0; s < coreLEDs; s++) {
+        for (uint8_t s = 0; s < gpioLEDs; s++) {
             if (!led[s].isSR) { sendToRGB(s, handoverColor[s]); break; }
         }
         srUpdateCallback = saved;
@@ -402,7 +403,7 @@ void coreGlitch1(const uint8_t segment, int duration){
         }
 
         // Animate the active segment; the opposite role always holds contrast
-        if (led[segment].role == ROLE_CORE) {
+        if (led[segment].role == ROLE_GPIO) {
             showColor(swatch[swNum].accent,      255,    swatch[swNum].contrast, 100,    50);
             showColor(swatch[swNum].background,   70,    swatch[swNum].contrast, 100,    50);
         } else {
@@ -440,10 +441,10 @@ void coreGlitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps
     uint8_t startColor[3] = {handoverColor[segment][0], handoverColor[segment][1], handoverColor[segment][2]};
     // Find a representative segment of the opposite role for handover reference
     uint8_t otherSegment = 0;
-    if (led[segment].role == ROLE_CORE) {
-        for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_EXT)  { otherSegment = s; break; } }
+    if (led[segment].role == ROLE_GPIO) {
+        for (uint8_t s = 0; s < gpioLEDs; s++) { if (led[s].role == ROLE_SR)  { otherSegment = s; break; } }
     } else {
-        for (uint8_t s = 0; s < coreLEDs; s++) { if (led[s].role == ROLE_CORE) { otherSegment = s; break; } }
+        for (uint8_t s = 0; s < gpioLEDs; s++) { if (led[s].role == ROLE_GPIO) { otherSegment = s; break; } }
     }
     // Hold otherSegment at its handoverColor, and flash segment between startColor and color2 twice
     for (int reps = 0; reps < 3; reps++) {
@@ -452,7 +453,7 @@ void coreGlitch3(uint8_t segment, uint8_t color2[3], int duration,  uint8_t reps
             return;
         }
 
-        if (led[segment].role == ROLE_CORE) {
+        if (led[segment].role == ROLE_GPIO) {
             showColor(startColor, 255, handoverColor[otherSegment], 255, duration);
             showColor(color2, 255, handoverColor[otherSegment], 255, duration);
         } else {
@@ -473,8 +474,8 @@ void coreGlitch4(uint8_t reps, int duration) {
             return;
         }
 
-        for (uint8_t segment = 0; segment < coreLEDs; segment++) {
-            if (led[segment].role == ROLE_EXT) continue;
+        for (uint8_t segment = 0; segment < gpioLEDs; segment++) {
+            if (led[segment].role == ROLE_SR) continue;
             gradientPosition(random(1, 255), color);
             for (uint8_t i = 0; i < reps; i++) {
                 sendToRGB(segment, color);
@@ -585,7 +586,7 @@ void swatchPreview() {
 
         gradientPosition(gradientPos, outputColor);
 
-        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, outputColor); }
+        for (uint8_t seg = 1; seg < gpioLEDs; seg++) { sendToRGB(seg, outputColor); }
         sendToRGB(0, outputColor);
 
         delay(fadeUpDuration / fadeUpSteps);
@@ -598,7 +599,7 @@ void swatchPreview() {
 
         gradientPosition(gradientPos, outputColor);
 
-        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, outputColor); }
+        for (uint8_t seg = 1; seg < gpioLEDs; seg++) { sendToRGB(seg, outputColor); }
         sendToRGB(0, outputColor);
 
         delay(fadeDownDuration / fadeDownSteps);
@@ -617,7 +618,7 @@ void swatchPreview() {
 // -------------------------------------------------------------------------------------
 // MARK: animationPreview
 void animationPreview() {
-    const uint8_t flashDuration = 100; // Quick flash duration in ms
+    const uint8_t flashDuration = 20; // Quick flash duration in ms
     const uint8_t numFlashes = 3; // Number of flashes to indicate mode change
 
     // Store original brightness and temporarily increase it
@@ -629,12 +630,12 @@ void animationPreview() {
     // Flash the primary color quickly to indicate animation mode change
     for (uint8_t i = 0; i < numFlashes; i++) {
         // Bright flash
-        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, swatch[swNum].primary); }
+        for (uint8_t seg = 1; seg < gpioLEDs; seg++) { sendToRGB(seg, swatch[swNum].primary); }
         sendToRGB(0, swatch[swNum].primary);
         delay(flashDuration);
 
         // Dark flash
-        for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, swatch[swNum].background); }
+        for (uint8_t seg = 1; seg < gpioLEDs; seg++) { sendToRGB(seg, swatch[swNum].background); }
         sendToRGB(0, swatch[swNum].background);
         delay(flashDuration);
     }
@@ -770,7 +771,7 @@ void eyeRipple(uint8_t minGrad, uint8_t maxGrad, uint8_t brightness) {
     unsigned long now    = millis();
     uint8_t       baseIdx = (uint8_t)((now % RIPPLE_MS) * WAVE_STEPS / RIPPLE_MS);
 
-    uint8_t numCh = (extLEDs < 4) ? extLEDs : 4;
+    uint8_t numCh = (srLEDs < 4) ? srLEDs : 4;
     for (uint8_t ch = 0; ch < numCh; ch++) {
         uint8_t tableIdx = (baseIdx + phaseOffset[ch]) % WAVE_STEPS;
         uint8_t sineVal  = waveform[1].waveform[tableIdx]; // sine 0–255
@@ -799,7 +800,7 @@ void eyeScatter() {
     static unsigned long nextChange[4] = {0, 0, 0, 0};
 
     unsigned long now  = millis();
-    uint8_t       numCh = (extLEDs < 4) ? extLEDs : 4;
+    uint8_t       numCh = (srLEDs < 4) ? srLEDs : 4;
 
     for (uint8_t ch = 0; ch < numCh; ch++) {
         if (now >= nextChange[ch]) {
@@ -862,7 +863,7 @@ void brightnessAdjustmentMode() {
         // Display white at current brightness on all segments
         // SR segments are suppressed automatically by the brightnessAdjustMode check in sendToRGB
         for (int i = 0; i < 10; i++) { // Display multiple times per step for stability
-            for (uint8_t seg = 1; seg < coreLEDs; seg++) { sendToRGB(seg, whiteColor); }
+            for (uint8_t seg = 1; seg < gpioLEDs; seg++) { sendToRGB(seg, whiteColor); }
             sendToRGB(0, whiteColor);
             delay(stepDuration / 10);
         }

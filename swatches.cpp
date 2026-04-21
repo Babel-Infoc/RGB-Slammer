@@ -8,6 +8,9 @@
 // Initialise the swatch array index
 uint8_t swNum = 0;
 
+// Master array of swatches
+// All color values should have at least one channel at 255
+// to ensure that subsequent brightness functions are performed correctly
 /*
     primary
     accent
@@ -15,7 +18,6 @@ uint8_t swNum = 0;
     contrast
     background
 */
-// Master array of swatches
 swatchArray swatch[] = {
     {
         // 0 Neurotoxin
