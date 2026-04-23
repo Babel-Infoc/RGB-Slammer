@@ -129,7 +129,7 @@ void checkButtons() {
         }
 
         // Restart the debounce timer
-        debounceStart = 10; // Reduced for more responsive long press detection
+        debounceStart = 20; // Reduced for more responsive long press detection
     }
 }
 
@@ -181,23 +181,20 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     // Let the registered SR callback update shiftRegColors[] for this frame.
     if (srUpdateCallback) srUpdateCallback();
 
-    // Brightness adjustment mode: suppress SR output — pods show black
-    if (brightnessAdjustMode && srLEDs > 0) {
-        memset(shiftRegColors, 0, sizeof(shiftRegColors));
-    }
-
     // Gamma-correct the direct segment colour, then apply per-segment output scale.
-    // 8-bit fixed-point scaling: scaled = (a * b) >> 8  (0-255 × 0-255 → 0-255).
+    // Pipeline: tuneRatio → gamma8 (perceptual→physical) → currentBrightness (linear) → segOutputScale.
+    // Brightness is applied as a linear multiplier after gamma-correcting the colour.
+    // Applying gamma to currentBrightness would collapse the effective range.
     uint8_t tunedRGB[3];
     uint8_t coreScale = (segment < MAX_LED_SEGMENTS) ? segOutputScale[segment] : 255;
     for (uint8_t pin = 0; pin < 3; pin++) {
-        uint8_t adj   = (uint8_t)(((uint16_t)rgbValue[pin]               * tuneRatio[pin])    >> 8);
-        adj           = (uint8_t)(((uint16_t)adj                         * currentBrightness) >> 8);
-        tunedRGB[pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * coreScale)         >> 8);
+        uint8_t adj   = (uint8_t)(((uint16_t)rgbValue[pin]  * tuneRatio[pin])    >> 8);
+        adj           = pgm_read_byte(&gamma8[adj]);                                    // perceptual → physical
+        adj           = (uint8_t)(((uint16_t)adj             * currentBrightness) >> 8);
+        tunedRGB[pin] = (uint8_t)(((uint16_t)adj             * coreScale)         >> 8);
     }
 
-    // Gamma-correct all SR channel colours, then apply per-segment output scale.
-    // Build a per-channel scale lookup from segOutputScale via the led[] array.
+    // Same pipeline for SR channels.
     uint8_t tunedSR[4][3];
     if (srLEDs > 0) {
         uint8_t srChanScale[4] = {255, 255, 255, 255};
@@ -208,20 +205,20 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
         for (uint8_t ch = 0; ch < 4; ch++) {
             for (uint8_t pin = 0; pin < 3; pin++) {
                 uint8_t adj      = (uint8_t)(((uint16_t)shiftRegColors[ch][pin] * tuneRatio[pin])    >> 8);
+                adj              = pgm_read_byte(&gamma8[adj]);                                        // perceptual → physical
                 adj              = (uint8_t)(((uint16_t)adj                     * currentBrightness) >> 8);
-                tunedSR[ch][pin] = (uint8_t)(((uint16_t)pgm_read_byte(&gamma8[adj]) * srChanScale[ch]) >> 8);
+                tunedSR[ch][pin] = (uint8_t)(((uint16_t)adj                     * srChanScale[ch])   >> 8);
             }
         }
     }
 
-    // Combined software-PWM loop.
+    // Combined software-PWM loop with 256 steps for better low-brightness resolution.
     // Direct segment: active-HIGH (LOW = on).
     // SR channels:    active-LOW  (HIGH = off) — bytes start 0xFF, bits CLEARED to turn on.
     // QG/QH of SR1 (BTN1/BTN2) never cleared — remain HIGH at all times.
-    // SR bytes are only re-clocked when they change, reducing shiftOut calls from
-    // 200/frame to at most 26/frame (one initial clock + up to 12 threshold crossings).
+    // SR bytes are only re-clocked when they change, reducing shiftOut calls.
     uint8_t prev_sr1 = 0, prev_sr2 = 0; // initialised to 0 so first iteration always clocks
-    for (int brightness = 0; brightness < 100; brightness++) {
+    for (int brightness = 0; brightness < 256; brightness++) {
 
         // Drive direct LED only for valid segments
         if (segment < gpioLEDs) {
@@ -281,14 +278,4 @@ void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
     delay(slowDown);
 }
 
-// MARK: Role-based output ------------------------------
-// Convenience wrapper: calls sendToRGB for every segment whose role matches.
-// For correct SR/GPIO ordering the caller should invoke ROLE_SR first (SR buffer),
-// then ROLE_GPIO (triggers the PWM frame that flushes the SR buffer).
-void sendToRole(uint8_t role, const uint8_t color[3]) {
-    for (uint8_t seg = 0; seg < gpioLEDs; seg++) {
-        if (led[seg].role == role) {
-            sendToRGB(seg, color);
-        }
-    }
-}
+

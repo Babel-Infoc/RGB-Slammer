@@ -12,20 +12,20 @@ uint8_t swNum = 0;
 // All color values should have at least one channel at 255
 // to ensure that subsequent brightness functions are performed correctly
 /*
-    primary
-    accent
-    midtone
-    contrast
-    background
+    primary     = 0
+    accent      = 1
+    midtone     = 2
+    contrast    = 3
+    background  = 4
 */
-swatchArray swatch[] = {
+const swatchArray swatch[] = {
     {
         // 0 Neurotoxin
-        rgb(220, 255, 0),
+        rgb(200, 255, 0),
         rgb(180, 255, 0),
-        rgb(150, 255, 0),
-        rgb(220, 0, 255),
+        rgb(170, 255, 0),
         rgb(170, 0, 255),
+        rgb(200, 0, 255),
     },{
         // 1 Hazard pay
         rgb(255, 250, 0),
@@ -118,7 +118,7 @@ swatchArray swatch[] = {
         rgb(255, 50, 255),
         rgb(255, 0, 255),
     },{
-        // 14 Wintermute
+        // 14 Cryo
         rgb(255, 255, 255),
         rgb(200, 200, 255),
         rgb(150, 150, 255),
@@ -143,41 +143,41 @@ swatchArray swatch[] = {
         rgb(0, 255, 200),
         rgb(0, 255, 150),
         rgb(100, 255, 100),
-        rgb(255, 0, 150),
-        rgb(255, 0, 100),
+        rgb(255, 0, 255),
+        rgb(255, 0, 200),
     },{
         // 18 Villa Straylight
-        rgb(255,  255,  255),
-        rgb(230,  220,  255),
-        rgb(210,  180,  255),
-        rgb(190,  150,  255),
+        rgb(210,  200,  255),
+        rgb(200,  180,  255),
+        rgb(190,  160,  255),
+        rgb(180,  140,  255),
         rgb(170,  120,  255),
     },{
-        // 19 Incandescent
-        rgb(255, 255, 255),
-        rgb(255, 230, 220),
-        rgb(255, 210, 180),
-        rgb(255, 190, 150),
-        rgb(255, 170, 120),
+        // 19 Megawatt
+        rgb(255, 220, 100),
+        rgb(255, 0, 255),
+        rgb(0, 150, 255),
+        rgb(100, 100, 255),
+        rgb(0, 255, 255),
     },{
-        // 20 Doll
-        rgb(255,255,255),
-        rgb(255,220,230),
-        rgb(255,180,210),
-        rgb(255,150,190),
-        rgb(255,120,170),
+        // 20 Marathon
+        rgb(255, 0,    150),
+        rgb(100, 255,  0),
+        rgb(0,   255,  255),
+        rgb(0,   180,  255),
+        rgb(0,   100,  255),
     },{
-        // 21 Mint
-        rgb(255,255,255),
-        rgb(220,255,230),
-        rgb(180,255,210),
-        rgb(150,255,190),
-        rgb(120,255,170),
+        // 21 Crater
+        rgb(255, 150, 0),
+        rgb(100, 255,  0),
+        rgb(255, 0,    255),
+        rgb(0,  0,  255),
+        rgb(255,  0,  0),
     }
 };
 
 // Calculate the number of swatches automatically based on array size
-uint8_t numSwatches = sizeof(swatch) / sizeof(swatch[0]);
+const uint8_t numSwatches = sizeof(swatch) / sizeof(swatch[0]);
 
 // MARK: gradientPosition ------------------------------------------------------------------------------------------------
 // Calculates a gradient rgb color between all 5 colors in the current swatch

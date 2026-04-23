@@ -100,7 +100,7 @@ extern bool animationPreviewActive;
 extern bool brightnessAdjustMode;
 
 // Brightness mode trigger time
-extern const unsigned long brightnessModeTriggerTime;
+extern const uint16_t brightnessModeTriggerTime;
 
 // MARK: ------------------------------ Functions ------------------------------
 // Shift register channel color buffer (defined in rgbProcessor.cpp)
@@ -108,7 +108,6 @@ extern uint8_t shiftRegColors[4][3];
 
 void calculateLuminance();
 void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]);
-void sendToRole(uint8_t role, const uint8_t color[3]);
 void eyeDoublePulse();
 void swatchPreview();
 void animationPreview();

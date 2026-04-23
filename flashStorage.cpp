@@ -60,7 +60,7 @@ bool saveSettingsToFlash(uint8_t swatchNum, uint8_t brightness, uint8_t animatio
     FlashSettings newSettings;
     newSettings.signature = SETTINGS_SIGNATURE;
     newSettings.swatchNumber = swatchNum;
-    newSettings.brightness    = brightness; // already stored as 0-255 fixed-point
+    newSettings.brightness    = brightness;
     newSettings.animationMode = animationMode;
     newSettings.checksum = calculateChecksum(&newSettings);
 
@@ -100,7 +100,7 @@ bool saveSettingsToFlash(uint8_t swatchNum, uint8_t brightness, uint8_t animatio
     // Verify the written data
     const FlashSettings* storedSettings = (const FlashSettings*)FLASH_SETTINGS_PAGE_ADDR;
     if (storedSettings->swatchNumber == swatchNum &&
-        storedSettings->brightness == (uint8_t)(brightness * 255.0f) &&
+        storedSettings->brightness == brightness &&
         storedSettings->signature == SETTINGS_SIGNATURE &&
         storedSettings->checksum == calculateChecksum(storedSettings)) {
         return true;

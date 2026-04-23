@@ -9,6 +9,6 @@ struct waveformArray {
 };
 
 // Master waveform array
-extern waveformArray waveform[];
+extern const waveformArray waveform[];
 
 #endif // ENVELOPES_H
