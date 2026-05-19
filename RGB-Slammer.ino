@@ -10,7 +10,7 @@
 #include "flashStorage.h"
 // Select from the active hardware configuration options in hardware.h
 // That file stores all GPIO pin assignments, brightness tuning, and LED calibration values.
-#define ACTIVE_CONFIG CONFIG_NANOFRAME
+#define ACTIVE_CONFIG CONFIG_BREACH_KEY
 #include "hardware.h"
 
 // Define the LED array and button pins according to the active configuration
