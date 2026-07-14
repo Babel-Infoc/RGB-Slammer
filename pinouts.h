@@ -57,7 +57,7 @@ const PinConfig AG_ECHO_FRAME_PINOUT = {
         {PD2, PD3, PD4}  // Main body
     },
     .colorButton = PC3,
-    .animButton = PC4
+    .animButton = PC0
 };
 
 // Function to get the active configuration based on the selected hardware
