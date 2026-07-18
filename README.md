@@ -3,8 +3,8 @@
  <img width=200px height=200px src="https://avatars.githubusercontent.com/u/129355944?v=4" alt="Bot logo"></a>
 </p>
 
-# <p align="center">RGB Slammer</p>
-<p align="center">Run RGB LED animations on fuckin anything</p>
+# <p align="center">Lightswitch Rave</p>
+<p align="center">Use PWM for RGB LED's on GPIO pins witohut libraries</p>
 
 ## About <a name = "about"></a>
 
@@ -19,24 +19,24 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
 - ### Swatch arrays
     Iterate or randomize animation colors through customisable and expandable swatches<br>Color swatches are configured with a standard structure:
     ```cpp
-    swatch[0].primary;
-    swatch[0].accent;
-    swatch[0].contrast;
-    swatch[0].background;
+    swatch[0].color0;
+    swatch[0].color1;
+    swatch[0].color4;
+    swatch[0].color4;
     ```
-    Use `[0]` or `[1]` to set the color for the first or second led segment<br>Create or modify swatches in `swatches.cpp`
+    Use `[0]` or `[1]` to set the color for the first or second led zone<br>Create or modify swatches in `swatches.cpp`
 - ### Automatic color tuning
     All RGB LEDs's have slightly different percieved brightness and between the red green and blue elements when provided the same power, which can affect the white tone and colour accuracy. Automatic color tuning is achieved by entering the typical mA and Luminance value for `red`, `green`, and `blue` according to your LED's datasheet.
 - ### Gamma correction
     Fix the percieved LED brightness curve using <a href="https://learn.adafruit.com/led-tricks-gamma-correction/">Phillip Burgess' fix</a>
 - ### Dual simultaneous output
-    Both segments can be configured for separate colors and animations, which will all run simultaneously
+    Both zones can be configured for separate colors and animations, which will all run simultaneously
 - ### Preconfigured animations
     Included is a number of preconfigured animation elements and longer animation cycles, which are easily configured using main loop arguments
 - ### Configurable brightness modifier
     Hold the button for 2 seconds to enter brightness adjustment mode. Keep holding, and release when desired brightness is reached.
 - ### Handover color
-    Some animation subroutines are designed to fade in or interact with the last color displayed by the previous subroutine, as such all subroutines store their last RGB color in segment specific variables called handoverColor
+    Some animation subroutines are designed to fade in or interact with the last color displayed by the previous subroutine, as such all subroutines store their last RGB color in zone specific variables called handoverColor
 
 ## Reason for development
 I wanted to run LED animations off the CH32V03.

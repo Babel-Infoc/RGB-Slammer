@@ -6,35 +6,34 @@
 // Initialize the buttons
 uint8_t colorButtonLastState = HIGH;
 uint8_t animButtonLastState = HIGH;
-uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
 
-// Animation mode (0 = glitchLoop, 1 = other animations...)
-uint8_t animationMode = 0;
-const uint8_t numAnimationModes = 1; // Currently only glitchLoop, expand this as you add more
-
-// Swatch preview animation flag
+// Initialise preview states
 bool swatchPreviewActive = false;
-
-// Animation preview flag
 bool animationPreviewActive = false;
+bool previewMode = false;
 
 // Brightness adjustment mode variables
 unsigned long buttonPressStartTime = 0;
-bool buttonHeldFor2Seconds = false;
+bool buttonLongHold = false;
 
 // Replace std::array with plain C arrays to save significant flash memory
-float tuneRatio[3] = {1.0, 1.0, 1.0};
+// tuneRatio stores color tuning ratios as 0-255 (where 255 = 1.0)
+uint8_t tuneRatio[3] = {0, 0, 0};
+// Last gradient position and brightness sent to each zone
 uint8_t handoverColor[2][3] = {{0, 0, 0}, {0, 0, 0}};
 
 // Reference to the led array and buttons defined in the main sketch
-extern ledSegment led[2];
+extern ledZone led[2];
 extern uint8_t colorBtn;
 extern uint8_t animBtn;
-extern float currentBrightness;
+extern uint8_t currentBrightness;
 
-// MARK: Gamma Correction ------------------------------
+// Global cache for the last RGB values sent to each zone
+RgbCache globalCache;
+
+// MARK: Gamma Correction
 const uint8_t PROGMEM gamma8[] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,
@@ -54,25 +53,25 @@ const uint8_t PROGMEM gamma8[] = {
   210,213,215,218,220,223,225,228,231,233,236,239,241,244,247, 249,
   252,255 };
 
-// MARK: Luminance Calculation ------------------------------
+// MARK: Luminance Calculation
 // Function to calculate luminance ratios for consistent color output
 void calculateLuminance() {
-    // Calculate the effective luminance per mA for each LED
-    float rEfficiency = red.luminance / red.mA;
-    float gEfficiency = green.luminance / green.mA;
-    float bEfficiency = blue.luminance / blue.mA;
+    // Calculate the effective luminance per mA for each LED (scaled to avoid overflow)
+    uint16_t rEfficiency = (uint16_t)red.luminance * 100 / red.mA;
+    uint16_t gEfficiency = (uint16_t)green.luminance * 100 / green.mA;
+    uint16_t bEfficiency = (uint16_t)blue.luminance * 100 / blue.mA;
 
     // Find the most efficient LED (highest luminance per mA)
-    float maxEfficiency = max(rEfficiency, max(gEfficiency, bEfficiency));
+    uint16_t maxEfficiency = max(rEfficiency, max(gEfficiency, bEfficiency));
 
-    // Scale all LEDs DOWN from the most efficient one
+    // Scale all LEDs DOWN from the most efficient one, stored as 0-255 (where 255 = 1.0)
     // This ensures no LED is driven above its baseline
-    tuneRatio[0] = rEfficiency / maxEfficiency; // Red ratio (≤ 1.0)
-    tuneRatio[1] = gEfficiency / maxEfficiency; // Green ratio (≤ 1.0)
-    tuneRatio[2] = bEfficiency / maxEfficiency; // Blue ratio (≤ 1.0)
+    tuneRatio[0] = (uint8_t)((uint16_t)rEfficiency * 255 / maxEfficiency); // Red ratio (≤ 255)
+    tuneRatio[1] = (uint8_t)((uint16_t)gEfficiency * 255 / maxEfficiency); // Green ratio (≤ 255)
+    tuneRatio[2] = (uint8_t)((uint16_t)bEfficiency * 255 / maxEfficiency); // Blue ratio (≤ 255)
 }
 
-// MARK: Button Handling ------------------------------
+// MARK: Button Handling
 void checkButtons() {
     if (debounceStart > 0) {
         debounceStart--;
@@ -84,27 +83,27 @@ void checkButtons() {
             if (colorButtonState == LOW) {
                 // Button just pressed - start timing
                 buttonPressStartTime = millis();
-                buttonHeldFor2Seconds = false;
+                buttonLongHold = false;
             } else {
                 // Button just released
-                if (!buttonHeldFor2Seconds) {
+                if (!buttonLongHold) {
                     // Short press - change swatch
-                    swNum = (swNum + 1) % numSwatches;
-                    saveSettingsToFlash(swNum, currentBrightness, animationMode);
+                    currentSwatch = (currentSwatch + 1) % numSwatches;
+                    saveSettingsToFlash(currentSwatch, currentBrightness, currentAnim);
                     swatchPreviewActive = true;
                 } else {
                     // Long press was released - exit brightness mode and save brightness
                     brightnessAdjustMode = false;
                     // Save both swatch and current brightness to flash
-                    saveSettingsToFlash(swNum, currentBrightness, animationMode);
+                    saveSettingsToFlash(currentSwatch, currentBrightness, currentAnim);
                 }
-                buttonHeldFor2Seconds = false;
+                buttonLongHold = false;
             }
             colorButtonLastState = colorButtonState;
-        } else if (colorButtonState == LOW && !buttonHeldFor2Seconds) {
+        } else if (colorButtonState == LOW && !buttonLongHold && !brightnessAdjustMode) {
             // Button is being held - check if trigger time has passed
             if (millis() - buttonPressStartTime >= brightnessModeTriggerTime) {
-                buttonHeldFor2Seconds = true;
+                buttonLongHold = true;
                 brightnessAdjustMode = true;
             }
         }
@@ -114,9 +113,8 @@ void checkButtons() {
 
         if (animButtonState != animButtonLastState) {
             if (animButtonState == LOW) {
-                // Button just pressed - cycle to next animation mode
-                animationMode = (animationMode + 1) % numAnimationModes;
-                saveSettingsToFlash(swNum, currentBrightness, animationMode);
+                // Button just pressed - cycle to next animation mode (flash save deferred to end of animationPreview)
+                currentAnim = (currentAnim + 1) % numAnimationModes;
                 animationPreviewActive = true;
             }
             animButtonLastState = animButtonState;
@@ -127,37 +125,88 @@ void checkButtons() {
     }
 }
 
-// MARK: Light sensor ------------------------------
+// MARK: Color Pipeline
 
-// MARK: RGB Processing ------------------------------
-// Function to process the raw RGB values to accurate and consistent luminosity and hue
-void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
-    float rRatio, gRatio, bRatio;
-    int tunedRGB[3];
+// MARK: calcGrad
+Colour calcGrad(const uint8_t zone, uint8_t gradPoint, const uint8_t alpha) {
+    Colour inputColor;
+    Colour outputColor;
+    uint8_t zone = gradPoint >> 6;      // Divide into 4 zones of 64 steps each
+    uint8_t step = gradPoint & 0x3F;    // Get remainder (0-63)
 
-    // Write the end color to the handover color matching the led segment
-    for (int i = 0; i < 3; i++) {
-        handoverColor[segment][i] = rgbValue[i];
+    // Pointers to the 5 swatch colors
+    const uint8_t* swcol1 = &swatch[currentSwatch].color0[0];
+    const uint8_t* swcol2 = &swatch[currentSwatch].color1[0];
+    const uint8_t* swcol3 = &swatch[currentSwatch].color2[0];
+    const uint8_t* swcol4 = &swatch[currentSwatch].color4[0];
+    const uint8_t* swcol5 = &swatch[currentSwatch].color4[0];
+
+    const uint8_t* startColor;
+    const uint8_t* endColor;
+
+    switch (zone) {
+        case 0:
+            startColor = swcol1;
+            endColor = swcol2;
+            break;
+        case 1:
+            startColor = swcol2;
+            endColor = swcol3;
+            break;
+        case 2:
+            startColor = swcol3;
+            endColor = swcol4;
+            break;
+        default:
+            startColor = swcol4;
+            endColor = swcol5;
+            break;
     }
 
-    // Calculate the brightness-adjusted and gamma-corrected values using global tuneRatio
-    for (uint8_t pin = 0; pin < 3; pin++) {
-        // Calculate the final RGB value with bounds checking to prevent overflow
-        float adjustedValue = rgbValue[pin] * tuneRatio[pin] * currentBrightness;
-        // Constrain to valid gamma table range (0-255)
-        int constrainedValue = constrain((int)adjustedValue, 0, 255);
-        tunedRGB[pin] = pgm_read_byte(&gamma8[constrainedValue]);
-    }
+    uint8_t alpha = (uint16_t)step * 255 / 63; // Scale 0-63 to 0-255
 
-    // Set the pin states based on the tuned RGB values
-    for (int brightness = 0; brightness < 100; brightness++) {
-        digitalWrite(led[segment].red, brightness < tunedRGB[0] ?      LOW : HIGH);
-        digitalWrite(led[segment].green, brightness < tunedRGB[1] ?    LOW : HIGH);
-        digitalWrite(led[segment].blue, brightness < tunedRGB[2] ?     LOW : HIGH);
-    }
+    inputColor.r = ((uint16_t)endColor[1] * alpha + (uint16_t)startColor[1] * (255 - alpha)) >> 8;
+    inputColor.g = ((uint16_t)endColor[2] * alpha + (uint16_t)startColor[2] * (255 - alpha)) >> 8;
+    inputColor.b = ((uint16_t)endColor[3] * alpha + (uint16_t)startColor[3] * (255 - alpha)) >> 8;
 
-    // Check buttons once per frame, with debounce handling
-    checkButtons();
-    // Slow down to prevent excessive CPU usage
-    delay(slowDown);
+    calcRGB(zone, inputColor, alpha);
+    return outputColor;
 }
+
+// MARK: calcRGB
+Colour calcRGB(const uint8_t zone, Colour inputColor, const uint16_t alpha) {
+    Colour outputColor;
+    // Calculate the actual output brightness modifier from 0 to currentBrightness, using alpha as the pointer
+    uint16_t actualBrightness = (uint16_t)(((uint16_t)alpha * currentBrightness) / 65535);
+
+    // Apply color tuning ratio to color-correct against the LEDs' relative efficiency
+    inputColor.r = (uint16_t)(((uint16_t)inputColor.r * tuneRatio[0]) / 255);
+    inputColor.g = (uint16_t)(((uint16_t)inputColor.g * tuneRatio[1]) / 255);
+    inputColor.b = (uint16_t)(((uint16_t)inputColor.b * tuneRatio[2]) / 255);
+
+    // Convert to final brightness according to user-selected brightness level
+    inputColor.r = (uint16_t)(((uint16_t)inputColor.r * actualBrightness) / 255);
+    inputColor.g = (uint16_t)(((uint16_t)inputColor.g * actualBrightness) / 255);
+    inputColor.b = (uint16_t)(((uint16_t)inputColor.b * actualBrightness) / 255);
+
+    // Apply gamma correction for perceptually even brightness steps
+    outputColor.r = pgm_read_byte(&gamma8[inputColor.r]);
+    outputColor.g = pgm_read_byte(&gamma8[inputColor.g]);
+    outputColor.b = pgm_read_byte(&gamma8[inputColor.b]);
+
+    return outputColor;
+}
+
+/*
+// Send RGB values as PWM to GPIO
+void writeRGB() {
+    for (uint8_t zone = 0; zone < numLEDs; zone++) {
+        // 4. CORRECT WAY TO RECALL: Read from the global instance array
+        for (int step = 0; step < 256; step++) {
+            digitalWrite(led[zone].red,   step < globalCache.zones[zone].rgb[0] ? LOW : HIGH);
+            digitalWrite(led[zone].green, step < globalCache.zones[zone].rgb[1] ? LOW : HIGH);
+            digitalWrite(led[zone].blue,  step < globalCache.zones[zone].rgb[2] ? LOW : HIGH);
+        }
+    }
+}
+*/
