@@ -358,9 +358,7 @@ void fadeToColor(const uint8_t zone, Colour targetColor, const uint8_t alpha){
     Colour output;
 
     // Copy handoverColor to startColor
-    startColor.r = handoverColor.r;
-    startColor.g = handoverColor.g;
-    startColor.b = handoverColor.b;
+    startColor.r = handoverColor
 
     unsigned long startTime = millis();
     while (millis() - startTime < fadeTime) {
