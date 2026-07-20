@@ -21,8 +21,8 @@ struct PinConfig {
 // Configuration for Blinder Mini
 const PinConfig BLINDER_MINI = {
     .leds = {
-        {PC4, PC5, PC6}, // Upper LEDs
-        {PD3, PD4, PD5}  // Lower LEDs
+        {PC6, PC5, PC4}, // Upper LEDs
+        {PD5, PD4, PD3}  // Lower LEDs
     },
     .colorButton = PD6,
     .animButton = PD2

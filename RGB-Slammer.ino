@@ -28,7 +28,7 @@ uint8_t animBtn;
 uint8_t animIndex = 0;
 
 // Maximum brightness modifier, 0-255
-const float maxBrightness = 0.72;
+const float maxBrightness = 0.7;
 
 // Slow down all animations by this amount (in milliseconds)
 const uint8_t slowDown = 0;
@@ -322,7 +322,7 @@ void digitalEyes(const uint8_t baseFlickerChance, const uint8_t expressionChance
         currentTime = millis();
 
         // Random blinks
-        if (random(0, 1000) < 15) {
+        if (random(0, 1000) < 5) {
             showColor(swatch[swNum].background, swatch[swNum].background,50);
         }
         if (random(0, 1000) < 2) {

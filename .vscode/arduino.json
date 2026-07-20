@@ -3,5 +3,5 @@
     "sketch": "RGB-Slammer.ino",
     "configuration": "pnum=CH32V003F4,upload_method=swdMethod,opt=osstd,dbg=none,rtlib=nano",
     "output": "./build",
-    "port": "COM4"
+    "port": "COM3"
 }
