@@ -8,7 +8,7 @@
 
 ## About <a name = "about"></a>
 
-This is my solution to getting RGB animations on the CH32V003 with the Arduino IDE, but you can use this to run RGB LEDs on any chip that has 3 GPIO pins without dependancies or other libraries.
+This is my solution to getting RGB animations on the CH32V003 with the Arduino IDE, but you can use this to run RGB LEDs on any chip that has 3 GPIOLED pins without dependancies or other libraries.
 
  ## Features <a name = "features"></a>
 - ### VSCode Color Decorator compatibility
@@ -24,22 +24,22 @@ This is my solution to getting RGB animations on the CH32V003 with the Arduino I
     swatch[0].contrast;
     swatch[0].background;
     ```
-    Use `[0]` or `[1]` to set the color for the first or second led segment<br>Create or modify swatches in `swatches.cpp`
+    Use `[0]` or `[1]` to set the color for the first or second led zone<br>Create or modify swatches in `swatches.cpp`
 - ### Automatic color tuning
     All RGB LEDs's have slightly different percieved brightness and between the red green and blue elements when provided the same power, which can affect the white tone and colour accuracy. Automatic color tuning is achieved by entering the typical mA and Luminance value for `red`, `green`, and `blue` according to your LED's datasheet.
 - ### Gamma correction
     Fix the percieved LED brightness curve using <a href="https://learn.adafruit.com/led-tricks-gamma-correction/">Phillip Burgess' fix</a>
 - ### Dual simultaneous output
-    Both segments can be configured for separate colors and animations, which will all run simultaneously
+    Both zones can be configured for separate colors and animations, which will all run simultaneously
 - ### Preconfigured animations
     Included is a number of preconfigured animation elements and longer animation cycles, which are easily configured using main loop arguments
 - ### Configurable brightness modifier
     Hold the button for 2 seconds to enter brightness adjustment mode. Keep holding, and release when desired brightness is reached.
 - ### Handover color
-    Some animation subroutines are designed to fade in or interact with the last color displayed by the previous subroutine, as such all subroutines store their last RGB color in segment specific variables called handoverColor
+    Some animation subroutines are designed to fade in or interact with the last color displayed by the previous subroutine, as such all subroutines store their last RGB color in zone specific variables called handoverColor
 
 ## Reason for development
 I wanted to run LED animations off the CH32V03.
 Currently, neither the Neopixel or FastLED libraries support RISK-V chips, and WCH Board drivers have had bugs with AnalogWrite functions for nearly a year.
 
-Due to these limitations, I wanted a way to drive RGB animations using purely digitalWrite, to slam PWM on standard GPIO pins, without using any library dependancies. Therefore, this script can be used on any chip that can be proframmed via the ArduinoIDE, as long as you have at least 3 GPIO pins to assign to RGB.
+Due to these limitations, I wanted a way to drive RGB animations using purely digitalWrite, to slam PWM on standard GPIOLED pins, without using any library dependancies. Therefore, this script can be used on any chip that can be proframmed via the ArduinoIDE, as long as you have at least 3 GPIOLED pins to assign to RGB.

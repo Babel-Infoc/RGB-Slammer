@@ -1,7 +1,9 @@
 #include <Arduino.h>
-#include "types.h"
+#include "hardware.h"
 #include "swatches.h"
 #include "flashStorage.h"
+
+hardwareConfig config;
 
 // Initialize the buttons
 uint8_t colorButtonLastState = HIGH;
@@ -9,6 +11,12 @@ uint8_t animButtonLastState = HIGH;
 uint8_t colorIndex = 0;
 
 uint8_t debounceStart = 0;
+
+// Reference to the led array and buttons defined in the main sketch
+extern uint8_t colorBtn;
+extern uint8_t animBtn;
+extern uint8_t currentBrightness;
+extern zoneConfig led[5];
 
 // Animation mode (0 = glitchLoop, 1 = eye animation, expand as needed)
 uint8_t animationMode = 0;
@@ -25,15 +33,9 @@ unsigned long buttonPressStartTime = 0;
 bool buttonHeldFor2Seconds = false;
 
 uint8_t tuneRatio[3] = {255, 255, 255};
-uint8_t handoverColor[MAX_LED_SEGMENTS][3] = {};
+uint8_t handoverColor[5][3] = {};
 
-// Reference to the led array and buttons defined in the main sketch
-extern ledSegment led[MAX_LED_SEGMENTS];
-extern uint8_t colorBtn;
-extern uint8_t animBtn;
-extern uint8_t currentBrightness;
-
-// MARK: Gamma Correction ------------------------------
+// Gamma Correction
 const uint8_t PROGMEM gamma8[] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,
@@ -53,29 +55,30 @@ const uint8_t PROGMEM gamma8[] = {
   210,213,215,218,220,223,225,228,231,233,236,239,241,244,247, 249,
   252,255 };
 
-// MARK: Luminance Calculation ------------------------------
+// MARK: Luminance Calculation
 void calculateLuminance() {
     // Calculate output efficiency for each color channel
-    uint16_t rEff = (uint16_t)red.luminance   * 256 / (red.mA   ? red.mA   : 1);
-    uint16_t gEff = (uint16_t)green.luminance * 256 / (green.mA ? green.mA : 1);
-    uint16_t bEff = (uint16_t)blue.luminance  * 256 / (blue.mA  ? blue.mA  : 1);
+    uint8_t efficiency[3];
+    for (uint8_t i = 0; i < 3; i++) {
+        efficiency[i] = config.tuning[i][2] * 255 / (config.tuning[i][1]   ? config.tuning[i][1]   : 1);
+    }
 
     // Select the least efficient channel as the reference
-    uint16_t minEff = min(rEff, min(gEff, bEff));
+    uint16_t lowestEfficiency = min(efficiency[0], min(efficiency[1], efficiency[2]));
 
-    // Tune the other colors down by the ratio of their efficiency to the least efficient channel, capping at 255.
-    if (minEff == 0) {
+    // If lowestEfficiency=0, then all color values are equal and balanced, set all to max brightness 65535
+    if (lowestEfficiency == 0) {
         tuneRatio[0] = tuneRatio[1] = tuneRatio[2] = 255;
         return;
     }
 
-    // More efficient channel → smaller ratio → less output → balanced white.
-    tuneRatio[0] = (uint8_t)min((uint32_t)255, (uint32_t)minEff * 255 / rEff);
-    tuneRatio[1] = (uint8_t)min((uint32_t)255, (uint32_t)minEff * 255 / gEff);
-    tuneRatio[2] = (uint8_t)min((uint32_t)255, (uint32_t)minEff * 255 / bEff);
+    for (uint8_t i = 0; i < 3; i++) {
+        // More efficient channel → smaller ratio → less output → balanced white.
+        tuneRatio[i]  = (uint16_t)min((uint32_t)255, (uint32_t)lowestEfficiency * 255 / efficiency[i]);
+    }
 }
 
-// MARK: Button Handling ------------------------------
+// MARK: Button Handling
 void checkButtons() {
     // Don't process button events while a preview animation is playing.
     // sendToRGB calls checkButtons on every PWM frame, so without this guard
@@ -133,149 +136,77 @@ void checkButtons() {
     }
 }
 
-// MARK: Light sensor ------------------------------
-
-// MARK: Shift Register Output ------------------------------
+// MARK: Shift Register Output
 // Reference to shift register globals defined in the main sketch
 extern shiftRegPins shiftReg;
 extern uint8_t srLEDs;
 
-// Current colors for each shift register channel (up to 4)
-uint8_t shiftRegColors[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
-
-// SR update callback — called by sendToRGB before every GPIO (Core) PWM flush.
+// SR update callback — called by sendToRGB before every GPIOLEDLED (Core) PWM flush.
 // Set from the animation loop to eyeDoublePulse, eyeScatter, or any other function
-// that writes shiftRegColors[]. nullptr = no update; SR holds its previous state.
+// that writes handoverColor[]. nullptr = no update; SR holds its previous state.
 void (*srUpdateCallback)() = nullptr;
 
-// MARK: RGB Processing ------------------------------
-// Each sendToRGB call dispatches on segment type:
-//   GPIO segment  — invokes srUpdateCallback to update shiftRegColors[], then gamma-corrects
-//                    all colours and runs a full software-PWM frame driving GPIO pins AND
-//                    clocking all SR channels simultaneously.
-//   SR segment    — buffers the colour into shiftRegColors[]; the buffer is output on the
-//                    next GPIO segment’s PWM frame, keeping all outputs in temporal sync.
-// Call SR segments before the GPIO segment within one animation step for zero lag.
-extern uint8_t gpioLEDs;
-void sendToRGB(const uint8_t segment, const uint8_t rgbValue[3]) {
+// ============================================================================
+// MARK: RGB Processing
 
-    // Always record this colour as the handover value for transition animations
-    if (segment < gpioLEDs) {
-        for (uint8_t i = 0; i < 3; i++) {
-            handoverColor[segment][i] = rgbValue[i];
-        }
+void sendToRGB(const uint8_t zone, const uint8_t rgbValue[3]) {
+    uint32_t rRatio, gRatio, bRatio;
+    int tunedRGB[3];
+    // Record the handover color
+    for (uint8_t i = 0; i < 3; i++) {
+        handoverColor[zone][i] = rgbValue[i];
+        // If the zone in question is a shift register zone, bounce out now
+        // all SR colors will be calculated in one go later
+        if (led[zone].type == SHIFTREG) return;
     }
 
-    // SR segment: buffer the colour and return early.
-    // It will be clocked out during the next GPIO segment’s PWM frame.
-    if (segment < gpioLEDs && led[segment].isSR) {
-        uint8_t ch = led[segment].srChannel;
-        for (uint8_t i = 0; i < 3; i++) {
-            shiftRegColors[ch][i] = rgbValue[i];
-        }
-        return;
-    }
-
-    // GPIO segment: run full software-PWM loop ----------------------------------
-
-    // Let the registered SR callback update shiftRegColors[] for this frame.
+    // Let the registered SR callback update handoverColor[] for this frame.
     if (srUpdateCallback) srUpdateCallback();
 
-    // Gamma-correct the direct segment colour, then apply per-segment output scale.
-    // Pipeline: tuneRatio → gamma8 (perceptual→physical) → currentBrightness (linear) → segOutputScale.
+    // Gamma-correct the direct zone colour, then apply per-zone output scale.
+    // Pipeline: tuneRatio → gamma8 (perceptual→physical) → currentBrightness (linear) → zoneOutputScale.
     // Brightness is applied as a linear multiplier after gamma-correcting the colour.
     // Applying gamma to currentBrightness would collapse the effective range.
-    uint8_t tunedRGB[3];
-    uint8_t coreScale = (segment < MAX_LED_SEGMENTS) ? segOutputScale[segment] : 255;
-    for (uint8_t pin = 0; pin < 3; pin++) {
-        uint8_t adj   = (uint8_t)(((uint16_t)rgbValue[pin]  * tuneRatio[pin])    >> 8);
-        adj           = pgm_read_byte(&gamma8[adj]);                                    // perceptual → physical
-        adj           = (uint8_t)(((uint16_t)adj             * currentBrightness) >> 8);
-        tunedRGB[pin] = (uint8_t)(((uint16_t)adj             * coreScale)         >> 8);
-    }
+    uint8_t tunedColor[3];
 
-    // Same pipeline for SR channels.
-    uint8_t tunedSR[4][3];
-    if (srLEDs > 0) {
-        uint8_t srChanScale[4] = {255, 255, 255, 255};
-        for (uint8_t s = 0; s < gpioLEDs; s++) {
-            if (led[s].isSR && led[s].srChannel < 4)
-                srChanScale[led[s].srChannel] = segOutputScale[s];
-        }
-        for (uint8_t ch = 0; ch < 4; ch++) {
-            for (uint8_t pin = 0; pin < 3; pin++) {
-                uint8_t adj      = (uint8_t)(((uint16_t)shiftRegColors[ch][pin] * tuneRatio[pin])    >> 8);
-                adj              = pgm_read_byte(&gamma8[adj]);                                        // perceptual → physical
-                adj              = (uint8_t)(((uint16_t)adj                     * currentBrightness) >> 8);
-                tunedSR[ch][pin] = (uint8_t)(((uint16_t)adj                     * srChanScale[ch])   >> 8);
-            }
-        }
+    // Apply white balance
+    for (uint8_t i = 0; i < 3; i++) {
+        // Apply white balance adjustments
+        tunedColor[i]    = (uint8_t)(((uint16_t)rgbValue[i]     * tuneRatio[i]) >> 8);
+        // Apply currentBrightness modifier
+        tunedColor[i]    = (uint8_t)(((uint16_t)tunedColor[i]   * currentBrightness) >> 8);
+        // Apply per zone brightness scaling
+        //tunedColor[i]    = (uint8_t)(((uint16_t)tunedColor[i]   * led[zone].scale) >> 8);
+        // Apply gamma correction
+        //tunedColor[i]    = pgm_read_byte(&gamma8[tunedColor[i]]);
     }
 
     // Combined software-PWM loop with 256 steps for better low-brightness resolution.
-    // Direct segment: active-HIGH (LOW = on).
+    // Direct zone: active-HIGH (LOW = on).
     // SR channels:    active-LOW  (HIGH = off) — bytes start 0xFF, bits CLEARED to turn on.
     // QG/QH of SR1 (BTN1/BTN2) never cleared — remain HIGH at all times.
     // SR bytes are only re-clocked when they change, reducing shiftOut calls.
     uint8_t prev_sr1 = 0, prev_sr2 = 0; // initialised to 0 so first iteration always clocks
     for (int brightness = 0; brightness < 256; brightness++) {
-
-        // Drive direct LED only for valid segments
-        if (segment < gpioLEDs) {
-            digitalWrite(led[segment].red,   brightness < tunedRGB[0] ? LOW : HIGH);
-            digitalWrite(led[segment].green, brightness < tunedRGB[1] ? LOW : HIGH);
-            digitalWrite(led[segment].blue,  brightness < tunedRGB[2] ? LOW : HIGH);
-        }
-
-        if (srLEDs > 0) {
-            uint8_t sr1Byte = 0xFF; // U19: bits 0-5 = LEDs, bits 6-7 = BTN1/BTN2 (stay HIGH)
-            uint8_t sr2Byte = 0xFF; // U20: bits 0-5 = LEDs, bits 6-7 unused (stay HIGH)
-
-            // U19 (SR1): Ch2 QA-QC, Ch3 QD-QF
-            if (brightness < tunedSR[0][0]) sr1Byte &= ~(1 << 0); // QA = RED1
-            if (brightness < tunedSR[0][1]) sr1Byte &= ~(1 << 1); // QB = GREEN1
-            if (brightness < tunedSR[0][2]) sr1Byte &= ~(1 << 2); // QC = BLUE1
-            if (brightness < tunedSR[1][0]) sr1Byte &= ~(1 << 3); // QD = RED2
-            if (brightness < tunedSR[1][1]) sr1Byte &= ~(1 << 4); // QE = GREEN2
-            if (brightness < tunedSR[1][2]) sr1Byte &= ~(1 << 5); // QF = BLUE2
-
-            // U20 (SR2): Ch4 QA-QC, Ch5 QD-QF
-            if (brightness < tunedSR[2][0]) sr2Byte &= ~(1 << 0); // QA = RED3
-            if (brightness < tunedSR[2][1]) sr2Byte &= ~(1 << 1); // QB = GREEN3
-            if (brightness < tunedSR[2][2]) sr2Byte &= ~(1 << 2); // QC = BLUE3
-            if (brightness < tunedSR[3][0]) sr2Byte &= ~(1 << 3); // QD = RED4
-            if (brightness < tunedSR[3][1]) sr2Byte &= ~(1 << 4); // QE = GREEN4
-            if (brightness < tunedSR[3][2]) sr2Byte &= ~(1 << 5); // QF = BLUE4
-
-            // Only re-clock SR when bytes have changed (saves ~186 shiftOut calls/frame)
-            if (sr1Byte != prev_sr1 || sr2Byte != prev_sr2) {
-                prev_sr1 = sr1Byte;
-                prev_sr2 = sr2Byte;
-                digitalWrite(shiftReg.rclk, LOW);
-                shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr2Byte); // U20 first
-                shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, sr1Byte); // U19 second
-                digitalWrite(shiftReg.rclk, HIGH);
-            }
+        // Drive direct LED only for valid zones
+        if (led[zone].type == GPIOLED) {
+            digitalWrite(led[zone].r, brightness < tunedColor[0]     ? LOW : HIGH);
+            digitalWrite(led[zone].g, brightness < tunedColor[1]     ? LOW : HIGH);
+            digitalWrite(led[zone].b, brightness < tunedColor[2]     ? LOW : HIGH);
         }
     }
 
-    // Return all outputs to idle-off after the PWM frame
-    if (segment < gpioLEDs) {
-        digitalWrite(led[segment].red,   HIGH);
-        digitalWrite(led[segment].green, HIGH);
-        digitalWrite(led[segment].blue,  HIGH);
+        /*
+    // PWM Conversion
+    if (led[zone].type == GPIOLED) {
+        digitalWrite(led[zone].r, HIGH);
+        digitalWrite(led[zone].g, HIGH);
+        digitalWrite(led[zone].b, HIGH);
     }
-    if (srLEDs > 0) {
-        digitalWrite(shiftReg.rclk, LOW);
-        shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
-        shiftOut(shiftReg.ser, shiftReg.srclk, MSBFIRST, 0xFF);
-        digitalWrite(shiftReg.rclk, HIGH);
-    }
+    */
 
     // Check buttons once per frame, with debounce handling
     checkButtons();
     // Slow down to prevent excessive CPU usage
-    delay(slowDown);
+    delay(config.slowDown);
 }
-
-

@@ -4,14 +4,8 @@
 #include <Arduino.h>
 #include "types.h"
 
-// Define all available hardware configurations
-
-// Available configurations — use one of these as the ACTIVE_CONFIG define in RGB-Slammer.ino
-#define CONFIG_NANOFRAME      0
-#define CONFIG_BREACH_KEY     1
-#define CONFIG_AURORA_GLASYA  2
-#define CONFIG_BLINDER_MINI   3
-#define CONFIG_AG_ECHO_FRAME  4
+// Define all available hardware configurations.
+// The active configuration is selected by hardwarePlatform in the main sketch.
 
 // Configuration for Nanoframe
 // Two SN74HC595 shift registers (U19, U20) driven from PD4/PD3/PD2.
@@ -27,137 +21,114 @@
 //   QD=RED4  QE=GREEN4  QF=BLUE4   ← Channel 5
 //   QG=unused  QH=unused
 
-#if ACTIVE_CONFIG == CONFIG_NANOFRAME
-const PinConfig NANOFRAME_PINOUT = {
-    .leds = {
-        {PC1, PC2, PC3, false, 0, ROLE_GPIO}, // Seg 0: Core LED (direct GPIO)
-        {0,   0,   0,   true,  0, ROLE_SR},  // Seg 1: SR ch0 — eye top-left
-        {0,   0,   0,   true,  1, ROLE_SR},  // Seg 2: SR ch1 — eye bottom-left
-        {0,   0,   0,   true,  2, ROLE_SR},  // Seg 3: SR ch2 — eye top-right
-        {0,   0,   0,   true,  3, ROLE_SR},  // Seg 4: SR ch3 — eye bottom-right
+const hardwareConfig NANOFRAME = {
+    .zone = {
+        {PC1, PC2, PC3, 0, GPIOLED,  CORELED,       110}, // Seg 0: Core LED (direct GPIOLED)
+        {0,   0,   0,   0, SHIFTREG, EYETOPLEFT,    255},  // Seg 1: SR ch0 — eye top-left
+        {0,   0,   0,   1, SHIFTREG, EYEBOTTOMLEFT, 255},  // Seg 2: SR ch1 — eye bottom-left
+        {0,   0,   0,   2, SHIFTREG, EYETOPRIGHT,   255},  // Seg 3: SR ch2 — eye top-right
+        {0,   0,   0,   3, SHIFTREG, EYEBOTTOMRIGHT,255},  // Seg 4: SR ch3 — eye bottom-right
     },
-    .gpioLEDs = 5,
     .shiftReg    = {PD4, PD3, PD2}, // SER, RCLK, SRCLK
-    .shiftRegChannels = 4,
     .colorButton        = PC5,
     .animButton         = PC4,
     .defaultBrightness  = 50,
-    .pulseBrightness    = 255,
-    .segOutputScale     = {110, 255, 255, 255, 255},
     .minBrightness      = 50,
     .maxBrightness      = 180,
     .slowDown           = 1,
-    .redLed             = {5, 110},
-    .greenLed           = {5, 100},
-    .blueLed            = {5, 100}
+    .tuning             = {
+        {5, 110},
+        {5, 100},
+        {5, 100}
+    }
 };
-#endif // CONFIG_NANOFRAME
 
-#if ACTIVE_CONFIG == CONFIG_BREACH_KEY
-const PinConfig BREACH_KEY_PINOUT = {
-    .leds = {
-        {PC4, PC5, PC6, false, 0, ROLE_GPIO}, // Seg 0: Upper LEDs (primary color)
-        {PD4, PD5, PD3, false, 0, ROLE_SR},  // Seg 1: Lower LEDs (secondary color)
+const hardwareConfig BREACH_KEY = {
+    .zone = {
+        {PC4, PC5, PC6, 0, GPIOLED, CORELED, 255}, // Seg 0: Upper LEDs (primary color)
+        {PD4, PD5, PD3, 0, GPIOLED, ACCTLED, 255}, // Seg 1: Lower LEDs (secondary color)
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
     },
-    .gpioLEDs = 2,
     .shiftReg    = {0, 0, 0},
-    .shiftRegChannels = 0,
     .colorButton        = PD2,
     .animButton         = PIN_NONE, // No animation button on this platform
     .defaultBrightness  = 120,
-    .pulseBrightness    = 255,
-    .segOutputScale     = {255, 255, 255, 255, 255},
     .minBrightness      = 80,
     .maxBrightness      = 180,
     .slowDown           = 1, // Slowing down the chip to improve stability and smooth color transitions
-    .redLed             = {5, 110},
-    .greenLed           = {5, 100},
-    .blueLed            = {5, 100}
+    .tuning             = {
+        {5, 110},
+        {5, 100},
+        {5, 100}
+    }
 };
-#endif // CONFIG_BREACH_KEY
 
-#if ACTIVE_CONFIG == CONFIG_AURORA_GLASYA
-const PinConfig AURORA_GLASYA_PINOUT = {
-    .leds = {
-        {PC4, PC5, PC6, false, 0, ROLE_GPIO}, // Seg 0: Upper LEDs (primary color)
-        {PD4, PD5, PD3, false, 0, ROLE_SR},  // Seg 1: Lower LEDs (secondary color)
+const hardwareConfig AURORA_GLASYA = {
+    .zone = {
+        {PC4, PC5, PC6, 0, GPIOLED, CORELED, 100}, // Seg 0: Upper LEDs (primary color)
+        {PD4, PD5, PD3, 0, GPIOLED, ACCTLED, 255}, // Seg 1: Lower LEDs (secondary color)
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
     },
-    .gpioLEDs = 2,
     .shiftReg    = {0, 0, 0},
-    .shiftRegChannels = 0,
     .colorButton        = PD2,
     .animButton         = PIN_NONE, // No animation button on this platform
     .defaultBrightness  = 120,
-    .pulseBrightness    = 255,
-    .segOutputScale     = {100, 255, 255, 255, 255},
     .minBrightness      = 80,
     .maxBrightness      = 180,
     .slowDown           = 1,
-    .redLed             = {5, 110},
-    .greenLed           = {5, 100},
-    .blueLed            = {5, 100}
+    .tuning             = {
+        {5, 110},
+        {5, 100},
+        {5, 100}
+    }
 };
-#endif // CONFIG_AURORA_GLASYA
 
-#if ACTIVE_CONFIG == CONFIG_BLINDER_MINI
-const PinConfig BLINDER_MINI_PINOUT = {
-    .leds = {
-        {PC4, PC5, PC6, false, 0, ROLE_GPIO}, // Seg 0: Upper LEDs
-        {PD4, PD5, PD3, false, 0, ROLE_GPIO}, // Seg 1: Lower LEDs
+const hardwareConfig NANOSHARD = {
+    .zone = {
+        {PC6, PC5, PC4, 0, GPIOLED, CORELED, 255}, // Seg 0: Upper LEDs
+        {PD5, PD4, PD3, 0, GPIOLED, ACCTLED, 255}, // Seg 1: Lower LEDs
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
     },
-    .gpioLEDs = 2,
     .shiftReg    = {0, 0, 0},
-    .shiftRegChannels = 0,
-    .colorButton        = PD2,
-    .animButton         = PC7,
-    .defaultBrightness  = 180,
-    .pulseBrightness    = 255,
-    .segOutputScale     = {100, 100, 255, 255, 255},
-    .minBrightness      = 80,
-    .maxBrightness      = 200,
+    .colorButton        = PD6,
+    .animButton         = PD2,
+    .defaultBrightness  = 100,
+    .minBrightness      = 40,
+    .maxBrightness      = 100,
     .slowDown           = 1,
-    .redLed             = {5, 110},
-    .greenLed           = {5, 100},
-    .blueLed            = {5, 100}
+    .tuning             = {
+        {5, 110},
+        {5, 100},
+        {5, 100}
+    }
 };
-#endif // CONFIG_BLINDER_MINI
 
-#if ACTIVE_CONFIG == CONFIG_AG_ECHO_FRAME
-const PinConfig AG_ECHO_FRAME_PINOUT = {
-    .leds = {
-        {PD7, PD6, PD5, false, 0, ROLE_GPIO}, // Seg 0: Eyepiece
-        {PD2, PD3, PD4, false, 0, ROLE_GPIO}, // Seg 1: Main body
+const hardwareConfig AG_ECHO_FRAME = {
+    .zone = {
+        {PD7, PD6, PD5, 0, GPIOLED, CORELED, 255}, // Seg 0: Eyepiece
+        {PD2, PD3, PD4, 0, GPIOLED, ACCTLED, 255}, // Seg 1: Main body
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
+        {0,   0,   0,   0, NOTUSED, NOTUSED, 255}, // Not used
     },
-    .gpioLEDs = 2,
     .shiftReg    = {0, 0, 0},
-    .shiftRegChannels = 0,
     .colorButton        = PC3,
     .animButton         = PC0,
-    .defaultBrightness  = 180,
-    .pulseBrightness    = 255,
-    .segOutputScale     = {100, 100, 255, 255, 255},
+    .defaultBrightness  = 160,
     .minBrightness      = 80,
-    .maxBrightness      = 200,
+    .maxBrightness      = 180,
     .slowDown           = 1,
-    .redLed             = {5, 110},
-    .greenLed           = {5, 100},
-    .blueLed            = {5, 100}
+    .tuning             = {
+        {5, 110},
+        {5, 100},
+        {5, 100}
+    }
 };
-#endif // CONFIG_AG_ECHO_FRAME
-
-// Returns the single compiled-in hardware configuration
-inline const PinConfig& getActiveConfig() {
-#if ACTIVE_CONFIG == CONFIG_NANOFRAME
-    return NANOFRAME_PINOUT;
-#elif ACTIVE_CONFIG == CONFIG_BREACH_KEY
-    return BREACH_KEY_PINOUT;
-#elif ACTIVE_CONFIG == CONFIG_AURORA_GLASYA
-    return AURORA_GLASYA_PINOUT;
-#elif ACTIVE_CONFIG == CONFIG_BLINDER_MINI
-    return BLINDER_MINI_PINOUT;
-#else
-    return AG_ECHO_FRAME_PINOUT;
-#endif
-}
 
 #endif // HARDWARE_H

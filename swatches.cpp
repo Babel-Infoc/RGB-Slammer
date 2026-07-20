@@ -184,13 +184,13 @@ const uint8_t numSwatches = sizeof(swatch) / sizeof(swatch[0]);
 // position: 255 = background color, 0 = primary color
 void gradientPosition(uint8_t position, uint8_t output[3]) {
     // Create an rgb_t object to return
-    uint8_t segment = position >> 6;    // Divide by 64 (4 segments of 64 steps each) (inv_position >> 6)
+    uint8_t zone = position >> 6;    // Divide by 64 (4 zones of 64 steps each) (inv_position >> 6)
     uint8_t step = position & 0x3F;     // Get remainder (0-63) (inv_position & 0x3F)
-    // Clamp segment to valid range (segment > 3)
-    if (segment > 3) segment = 3;
+    // Clamp zone to valid range (zone > 3)
+    if (zone > 3) zone = 3;
     // Calculate pointers to start and end colors (startColor, endColor)
-    const uint8_t* startColor = &swatch[swNum].primary[0] + (4 - segment) * 3;
-    const uint8_t* endColor = &swatch[swNum].primary[0] + (3 - segment) * 3;
+    const uint8_t* startColor = &swatch[swNum].primary[0] + (4 - zone) * 3;
+    const uint8_t* endColor = &swatch[swNum].primary[0] + (3 - zone) * 3;
 
     // Calculate interpolation factor (0-63 to 0-255)
     uint8_t alpha = step << 2;  // Multiply by 4 to scale 0-63 to 0-252

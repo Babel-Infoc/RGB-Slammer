@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 // MARK: ------------------------------ Envelope definitions ------------------------------
-// Envelope structure, array of 32 brightness values, 0-255
+// Envelope structure, array of 32 brightness values, 0-65535
 struct waveformArray {
     uint8_t waveform[32];
 };

@@ -38,7 +38,7 @@ bool loadSettingsFromFlash(uint8_t* swatchNum, uint8_t* brightness, uint8_t* ani
             if (storedSettings->swatchNumber < numSwatches) {
                 // Settings are valid, load them
                 *swatchNum = storedSettings->swatchNumber;
-                *brightness = storedSettings->brightness; // already stored as 0-255 fixed-point
+                *brightness = storedSettings->brightness; // already stored as 0-65535 fixed-point
                 *animationMode = storedSettings->animationMode;
                 return true;
             }
